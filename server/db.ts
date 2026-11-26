@@ -260,6 +260,20 @@ async function migrate(db: Db) {
   );
 }
 
+/**
+ * The Postgres address. Hosting integrations name the variable differently from one
+ * to the next, and some add a prefix of their own, so after the usual names we take
+ * any variable that holds a Postgres address, preferring a pooled connection.
+ */
+export function findDatabaseUrl(env: Record<string, string | undefined> = process.env): string | undefined {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.POSTGRES_URL) return env.POSTGRES_URL;
+  const found = Object.entries(env).filter(([, v]) => v && /^postgres(ql)?:\/\//.test(v)) as [string, string][];
+  const rank = (name: string) => (/UNPOOLED|NON_POOLING|NO_SSL|PRISMA/.test(name) ? 2 : /DATABASE_URL$|POSTGRES_URL$/.test(name) ? 0 : 1);
+  found.sort((a, b) => rank(a[0]) - rank(b[0]) || a[0].localeCompare(b[0]));
+  return found[0]?.[1];
+}
+
 async function openPg(url: string): Promise<Db> {
   const { default: pg } = await import('pg');
   const local = /localhost|127\.0\.0\.1/.test(url);
@@ -298,8 +312,7 @@ async function openLite(dir?: string): Promise<Db> {
 }
 
 export async function openDb(opts: { url?: string; memory?: boolean } = {}): Promise<Db> {
-  // Vercel's Postgres integrations name the variable differently from one to the next.
-  const url = opts.url ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const url = opts.url ?? findDatabaseUrl();
   let db: Db;
   if (!url && !opts.memory && process.env.VERCEL) throw new NoDatabaseError();
   if (url && !opts.memory) db = await openPg(url);

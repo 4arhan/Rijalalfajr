@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../server/app.js';
-import { openDb, type Db } from '../server/db.js';
+import { findDatabaseUrl, openDb, type Db } from '../server/db.js';
 import { addDays, fajrWindow } from '../server/fajr.js';
 import { standings, streaks } from '../server/board.js';
 
@@ -51,6 +51,15 @@ beforeAll(async () => {
   const m = await call('POST', '/mosques', { token: admin.token, body: { name: 'East London Masjid', city: 'London', country: 'United Kingdom', ...LONDON } });
   expect(m.status).toBe(200);
   mosqueId = m.json.id;
+});
+
+describe('database address', () => {
+  it('is found under the usual names, or under a prefixed one, pooled first', () => {
+    expect(findDatabaseUrl({ DATABASE_URL: 'postgres://a', POSTGRES_URL: 'postgres://b' })).toBe('postgres://a');
+    expect(findDatabaseUrl({ POSTGRES_URL: 'postgres://b' })).toBe('postgres://b');
+    expect(findDatabaseUrl({ STORAGE_DATABASE_URL_UNPOOLED: 'postgresql://direct', STORAGE_DATABASE_URL: 'postgresql://pooled', OTHER: 'x' })).toBe('postgresql://pooled');
+    expect(findDatabaseUrl({ OWNER_EMAILS: 'a@b.c' })).toBeUndefined();
+  });
 });
 
 describe('fajr window', () => {
