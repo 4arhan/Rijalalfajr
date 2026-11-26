@@ -36,6 +36,17 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 
 **For the owner**: approve mosques for the world leaderboard, suspend a mosque, start seasons, handle reports, remove sponsor offers.
 
+## Languages
+
+The app and the about page are in 15 languages: English, Arabic, Urdu, Persian, Turkish, Indonesian, Malay, Bengali, Hindi, French, Spanish, Portuguese, Russian, Chinese and Swahili. Arabic, Urdu and Persian are laid out right to left. The app starts in the phone's language; people change it on the welcome screen or in Me.
+
+- The English text is the key: `t('Check in for Fajr')`, `tn(n, '{n} day', '{n} days')` for counts, `tx(...)` for a sentence with bold parts.
+- Each language is one file in `src/locales/` (app) and one in `about/locales/` (about page).
+- `npm run i18n` collects the app's text into `src/locales/en.json` and checks every translation for missing entries, placeholders and plural forms. After changing text on the about page, run `node scripts/about-keys.cjs` with the site running.
+- To add a language: add it to `LANGS` in `src/lib/i18n.tsx` and `about/about.ts`, and add the two files.
+
+The translations were written by AI and have not been checked by native speakers. The hadith on the Today screen is shown in English only until someone qualified has checked a translation.
+
 ## Run it
 
 ```bash
@@ -67,7 +78,14 @@ Set these environment variables:
 | `DATABASE_URL` | A Postgres connection string (Neon, Supabase or any other). Tables are created on first run. |
 | `OWNER_EMAILS` | Comma-separated emails that get the owner console. |
 
-The Vercel setup has not been deployed yet, so treat the first deployment as a test.
+Steps:
+
+1. In Vercel, choose **Add New → Project** and import this repository. The build settings come from `vercel.json`.
+2. In the project, open **Storage**, create a Postgres database (Neon) and connect it. That sets `DATABASE_URL`.
+3. Under **Settings → Environment Variables**, add `OWNER_EMAILS` with your email.
+4. Redeploy.
+
+Without a database the site still opens, and the app says it is not connected yet. The Vercel setup has not been deployed yet, so treat the first deployment as a test.
 
 ## How it is put together
 
@@ -80,6 +98,8 @@ The Vercel setup has not been deployed yet, so treat the first deployment as a t
 | `server/db.ts` | The schema and the two database drivers |
 | `src/pages/` | One file per screen |
 | `src/ui.tsx` | Shared pieces: session, podium, QR display, camera scanner |
+| `src/lib/i18n.tsx` | The language list and the translation functions |
+| `src/locales/`, `about/locales/` | One file per language |
 | `src/lib/offline.ts` | Attendance ticks kept on the phone when there is no signal |
 | `public/sw.js` | Keeps the app shell on the phone so it opens offline |
 | `about/` | The about page |
@@ -95,4 +115,4 @@ Ranking is by days attended, then longest streak, then earliest average arrival.
 
 ## Next
 
-Native apps for the App Store and Google Play, Fajr reminder notifications (nudges are in-app only for now), Arabic and other languages, sign in with Google or Apple, a map of mosques.
+Native apps for the App Store and Google Play, Fajr reminder notifications (nudges are in-app only for now), a review of the translations by native speakers, sign in with Google or Apple, a map of mosques.
