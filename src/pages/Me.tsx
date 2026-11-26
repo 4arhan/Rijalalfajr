@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Award, Building2, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck, Sparkles, Star,
+  Award, Building2, HandHeart, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck, Sparkles, Star,
   Sun, Sunrise, Trash2, Trophy, UserRound, Users, UsersRound,
 } from 'lucide-react';
 import { api, GROUPS, type Group, type Stats, type Striver } from '../api';
@@ -133,6 +133,7 @@ export function MePage() {
           <span className="icon"><UsersRound size={19} /></span>
           <span className="grow"><b>Start an organisation</b><span className="sub" style={{ display: 'block' }}>Group several mosques under one leaderboard</span></span>
         </button>
+        <LinkRow to="/sponsor" icon={<HandHeart size={19} />} title="Offer to sponsor" sub="Prizes, breakfast or funds for a mosque" />
         {me.user.owner && <LinkRow to="/owner" icon={<ShieldCheck size={19} />} title="Owner console" sub="Approve mosques and handle reports" />}
       </section>
 

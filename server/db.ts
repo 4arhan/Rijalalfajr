@@ -8,7 +8,7 @@ export interface Db {
   close(): Promise<void>;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 create table if not exists meta (key text primary key, value text not null);
@@ -132,6 +132,25 @@ create table if not exists prizes (
   detail text not null default '',
   sponsor text not null default ''
 );
+
+-- An offer to sponsor: either open to every mosque and organisation in a
+-- country, or made to one mosque.
+create table if not exists sponsors (
+  id text primary key,
+  user_id text not null references users(id) on delete cascade,
+  name text not null,
+  email text not null,
+  phone text not null default '',
+  country text not null,
+  city text not null default '',
+  kinds jsonb not null default '[]',
+  note text not null default '',
+  scope text not null check (scope in ('country','mosque')),
+  mosque_id text references mosques(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists sponsors_country on sponsors(lower(country));
+create index if not exists sponsors_mosque on sponsors(mosque_id);
 
 create table if not exists reports (
   id text primary key,

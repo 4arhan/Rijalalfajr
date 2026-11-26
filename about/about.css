@@ -129,6 +129,37 @@ a {
   border: 1px solid rgba(238, 248, 242, 0.35);
   color: var(--d-ink);
 }
+.btn.dark {
+  background: linear-gradient(180deg, #17432f, #0b2319);
+  color: #fff;
+}
+.sponsor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 56px;
+  align-items: center;
+  margin-top: 30px;
+}
+.sponsor-copy p {
+  font-size: 19px;
+  color: var(--ink-2);
+  max-width: 56ch;
+}
+.sponsor-copy ul {
+  list-style: none;
+  padding: 0;
+  margin: 22px 0 28px;
+  display: grid;
+  gap: 0;
+}
+.sponsor-copy li {
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.sponsor-copy li b {
+  color: var(--ink);
+}
 .btn.big {
   min-height: 54px;
   padding: 0 26px;
@@ -582,7 +613,8 @@ summary:focus-visible {
   .cards.two {
     grid-template-columns: 1fr;
   }
-  .tour-in {
+  .tour-in,
+  .sponsor {
     grid-template-columns: 1fr;
     gap: 32px;
   }

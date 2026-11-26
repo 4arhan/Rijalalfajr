@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Flag, Landmark } from 'lucide-react';
+import { Flag, HandHeart, Landmark } from 'lucide-react';
+import type { Sponsor } from './Sponsor';
 import { api } from '../api';
 import { Eyebrow, Loading, Problem, Screen, useAction } from '../ui';
 import { useLoad } from '../lib/util';
@@ -8,6 +9,7 @@ interface OwnerData {
   mosques: { id: string; name: string; city: string; country: string; verified: boolean; suspended: boolean; practice: boolean; checkins: number; members: number }[];
   reports: { id: string; target_type: string; target_id: string; reason: string; reporter: string | null }[];
   totals: { users: number; strivers: number; mosques: number; checkins: number };
+  sponsors: Sponsor[];
 }
 
 export function OwnerPage() {
@@ -45,6 +47,22 @@ export function OwnerPage() {
             ))}
           </div>
         ) : <p className="muted small">No open reports.</p>}
+      </section>
+      <section className="card">
+        <Eyebrow icon={<HandHeart size={15} />}>Sponsor offers</Eyebrow>
+        {data.sponsors.length ? (
+          <div className="list">
+            {data.sponsors.map((s) => (
+              <div className="item" key={s.id}>
+                <span className="grow">
+                  <b>{s.name}</b>
+                  <span className="sub" style={{ display: 'block' }}>{s.scope === 'mosque' ? `For ${s.mosqueName}` : `Open to ${s.country}`} · {s.kinds.join(', ')} · {s.email}</span>
+                </span>
+                <button className="btn sm danger" disabled={act.busy} onClick={() => confirm('Remove this offer?') && act.run(async () => { await api(`/sponsors/${s.id}`, { method: 'DELETE' }); reload(); })}>Remove</button>
+              </div>
+            ))}
+          </div>
+        ) : <p className="muted small">No sponsor offers yet.</p>}
       </section>
       <section className="card">
         <Eyebrow icon={<Landmark size={15} />}>Mosques</Eyebrow>

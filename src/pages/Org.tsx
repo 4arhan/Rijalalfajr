@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Landmark, Plus, Trophy, Users, UsersRound } from 'lucide-react';
+import { HandHeart, Landmark, Plus, Trophy, Users, UsersRound } from 'lucide-react';
 import { api, type ChallengeBrief, type Standing } from '../api';
 import { Eyebrow, LinkRow, Loading, Problem, RankList, Screen, useMe } from '../ui';
 import { niceDate, plural, useLoad } from '../lib/util';
+import { SponsorCards, type Sponsor } from './Sponsor';
 
 interface OrgData {
   org: { id: string; name: string; code: string | null };
@@ -18,6 +19,7 @@ export function OrgPage() {
   const me = useMe();
   const mine = useMemo(() => new Set(me.strivers.map((s) => s.id)), [me]);
   const { data, error, reload } = useLoad(() => api<OrgData>(`/orgs/${id}`), [id]);
+  const sponsors = useLoad(() => api<{ sponsors: Sponsor[] }>(`/orgs/${id}/sponsors`).catch(() => ({ sponsors: [] })), [id]);
   if (error) return <Screen title="Organisation" back><Problem error={error} retry={reload} /></Screen>;
   if (!data) return <Screen title="Organisation" back><Loading /></Screen>;
   const total = data.mosques.reduce((a, m) => a + m.total, 0);
@@ -59,6 +61,13 @@ export function OrgPage() {
         {data.canEdit && <LinkRow to={`/challenge/new?scope=org:${data.org.id}`} icon={<Plus size={19} />} title="New challenge" sub="With prizes across all your mosques" />}
         {!data.canEdit && data.challenges.length === 0 && <p className="muted small" style={{ padding: '12px 0' }}>No challenges yet.</p>}
       </section>
+
+      {data.canEdit && (
+        <>
+          <Eyebrow icon={<HandHeart size={15} />}>Sponsor offers for your mosques and their countries</Eyebrow>
+          {sponsors.data?.sponsors.length ? <SponsorCards sponsors={sponsors.data.sponsors} /> : <p className="muted small">No offers yet. Only you can see this section.</p>}
+        </>
+      )}
 
       <section className="card">
         <Eyebrow icon={<Users size={15} />}>Top strivers, last 30 days</Eyebrow>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BadgeCheck, Flag, Settings2, Sunrise, Trophy, Users, UsersRound } from 'lucide-react';
+import { BadgeCheck, Flag, HandHeart, Settings2, Sunrise, Trophy, Users, UsersRound } from 'lucide-react';
 import { api, GROUPS, type Group, type MosquePage as MosqueData, type Standing } from '../api';
 import { Eyebrow, Field, LinkRow, Loading, Podium, Problem, RankList, Screen, Seg, Sheet, useAction, useMe, useSession, useToast } from '../ui';
 import { niceDate, plural, timeIn, useLoad } from '../lib/util';
@@ -147,6 +147,11 @@ function MosqueView({ id, back }: { id: string; back?: true }) {
           <p className="muted small">A squad is up to 10 friends who hold each other to Fajr. Squads are ranked by days per member over the last 30 days.</p>
         )}
       </section>
+
+      <Link to={`/sponsor?mosque=${mosque.id}`} className="card row" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <span className="icon"><HandHeart size={20} /></span>
+        <span className="grow"><b style={{ display: 'block' }}>Sponsor this mosque</b><span className="muted small">Offer prizes or breakfast. The mosque contacts you.</span></span>
+      </Link>
 
       <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => setSheet('report')}><Flag size={15} /> Report a problem</button>
 

@@ -1180,6 +1180,101 @@ export function createApp(opts: AppOptions) {
     return c.json({ rows: list.slice(0, 200), countries: countries.map((r) => r.country) });
   });
 
+  // ---------- sponsors ----------
+
+  const SPONSOR_KINDS = ['prizes', 'breakfast', 'funds', 'vouchers', 'other'] as const;
+  const sponsorSchema = z
+    .object({
+      name: z.string().trim().min(2).max(80),
+      email: z.string().trim().toLowerCase().email().max(200),
+      phone: z.string().trim().max(40).default(''),
+      country: z.string().trim().min(2).max(60),
+      city: z.string().trim().max(60).default(''),
+      kinds: z.array(z.enum(SPONSOR_KINDS)).min(1, 'Choose at least one way to sponsor'),
+      note: z.string().trim().max(500).default(''),
+      scope: z.enum(['country', 'mosque']),
+      mosqueId: z.string().nullable().default(null),
+    })
+    .refine((v) => v.scope === 'country' || !!v.mosqueId, 'Choose the mosque you want to sponsor');
+
+  type SponsorRow = {
+    id: string; user_id: string; name: string; email: string; phone: string; country: string; city: string;
+    kinds: string[]; note: string; scope: 'country' | 'mosque'; mosque_id: string | null; mosque_name: string | null; created_at: Date;
+  };
+  const sponsorJson = (r: SponsorRow) => ({
+    id: r.id, name: r.name, email: r.email, phone: r.phone, country: r.country, city: r.city, kinds: r.kinds, note: r.note,
+    scope: r.scope, mosqueId: r.mosque_id, mosqueName: r.mosque_name, createdAt: r.created_at,
+  });
+  const SPONSOR_SELECT = `select s.*, m.name as mosque_name from sponsors s left join mosques m on m.id = s.mosque_id`;
+
+  app.post('/sponsors', async (c) => {
+    const u = need(c);
+    const v = await body(c, sponsorSchema);
+    const db = c.get('db');
+    const [n] = await db.query<{ n: number }>(`select count(*)::int as n from sponsors where user_id = $1`, [u.id]);
+    if (n.n >= 5) throw new HttpError(429, 'limit', 'One account can make up to 5 sponsor offers.');
+    if (v.scope === 'mosque') await getMosque(db, v.mosqueId!);
+    const id = newId();
+    await db.query(
+      `insert into sponsors (id, user_id, name, email, phone, country, city, kinds, note, scope, mosque_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [id, u.id, v.name, v.email, v.phone, v.country, v.city, JSON.stringify(v.kinds), v.note, v.scope, v.scope === 'mosque' ? v.mosqueId : null],
+    );
+    return c.json({ id });
+  });
+
+  app.get('/sponsors/mine', async (c) => {
+    const u = need(c);
+    const rows = await c.get('db').query<SponsorRow>(`${SPONSOR_SELECT} where s.user_id = $1 order by s.created_at desc`, [u.id]);
+    return c.json({ sponsors: rows.map(sponsorJson) });
+  });
+
+  app.put('/sponsors/:id', async (c) => {
+    const u = need(c);
+    const v = await body(c, sponsorSchema);
+    const db = c.get('db');
+    if (v.scope === 'mosque') await getMosque(db, v.mosqueId!);
+    const rows = await db.query(
+      `update sponsors set name=$3, email=$4, phone=$5, country=$6, city=$7, kinds=$8, note=$9, scope=$10, mosque_id=$11
+       where id = $1 and user_id = $2 returning id`,
+      [c.req.param('id'), u.id, v.name, v.email, v.phone, v.country, v.city, JSON.stringify(v.kinds), v.note, v.scope, v.scope === 'mosque' ? v.mosqueId : null],
+    );
+    if (!rows.length) throw new HttpError(404, 'not_found', 'That sponsor offer was not found.');
+    return c.json({ ok: true });
+  });
+
+  app.delete('/sponsors/:id', async (c) => {
+    const u = need(c);
+    await c.get('db').query(`delete from sponsors where id = $1 and (user_id = $2 or $3::boolean)`, [c.req.param('id'), u.id, isOwner(u)]);
+    return c.json({ ok: true });
+  });
+
+  // Contact details are for the people who run a mosque or organisation, not for the public.
+  app.get('/mosques/:id/sponsors', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id, true);
+    const db = c.get('db');
+    const m = await getMosque(db, id);
+    const rows = await db.query<SponsorRow>(
+      `${SPONSOR_SELECT} where s.mosque_id = $1 or (s.scope = 'country' and lower(s.country) = lower($2) and $2 <> '')
+       order by (s.mosque_id is null), s.created_at desc limit 200`,
+      [id, m.country.trim()],
+    );
+    return c.json({ sponsors: rows.map(sponsorJson), country: m.country });
+  });
+
+  app.get('/orgs/:id/sponsors', async (c) => {
+    const id = c.req.param('id');
+    need(c);
+    if (!(await canManageScope(c, 'org', id))) throw new HttpError(403, 'forbidden', 'Only the organisation owner can see its sponsors.');
+    const rows = await c.get('db').query<SponsorRow>(
+      `${SPONSOR_SELECT} where s.mosque_id in (select id from mosques where org_id = $1)
+         or (s.scope = 'country' and lower(s.country) in (select lower(trim(country)) from mosques where org_id = $1 and country <> ''))
+       order by (s.mosque_id is null), s.created_at desc limit 200`,
+      [id],
+    );
+    return c.json({ sponsors: rows.map(sponsorJson) });
+  });
+
   // ---------- reports and the owner console ----------
 
   app.post('/reports', async (c) => {
@@ -1212,7 +1307,8 @@ export function createApp(opts: AppOptions) {
       `select (select count(*)::int from users) as users, (select count(*)::int from strivers) as strivers,
               (select count(*)::int from mosques) as mosques, (select count(*)::int from checkins) as checkins`,
     );
-    return c.json({ mosques, reports, totals });
+    const sponsors = await db.query<SponsorRow>(`${SPONSOR_SELECT} order by s.created_at desc limit 200`);
+    return c.json({ mosques, reports, totals, sponsors: sponsors.map(sponsorJson) });
   });
 
   app.post('/owner/mosques/:id', async (c) => {

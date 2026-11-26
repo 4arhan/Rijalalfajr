@@ -4,6 +4,7 @@ import { LocateFixed, MapPin, ShieldCheck, Timer, Trash2, UsersRound } from 'luc
 import { api, DEFAULT_LABELS, GROUPS, type Labels, type MosquePage as MosqueData } from '../api';
 import { Eyebrow, Field, Loading, Screen, Switch, useAction, useSession, useToast } from '../ui';
 import { getPosition, useLoad } from '../lib/util';
+import { COUNTRIES } from '../lib/countries';
 
 const METHODS: [string, string][] = [
   ['MuslimWorldLeague', 'Muslim World League'],
@@ -82,7 +83,13 @@ export function MosqueSettings() {
         <Field label="Mosque name"><input value={f.name} onChange={(e) => set('name', e.target.value)} maxLength={80} placeholder="e.g. Masjid an-Noor" /></Field>
         <div className="grid2">
           <Field label="City"><input value={f.city} onChange={(e) => set('city', e.target.value)} maxLength={60} /></Field>
-          <Field label="Country"><input value={f.country} onChange={(e) => set('country', e.target.value)} maxLength={60} /></Field>
+          <Field label="Country">
+            <select value={f.country} onChange={(e) => set('country', e.target.value)}>
+              <option value="">Choose</option>
+              {f.country && !COUNTRIES.includes(f.country) && <option>{f.country}</option>}
+              {COUNTRIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </Field>
         </div>
       </section>
 

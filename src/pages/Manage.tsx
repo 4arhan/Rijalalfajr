@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BarChart3, Check, ClipboardList, Download, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, X } from 'lucide-react';
+import { BarChart3, Check, ClipboardList, Download, HandHeart, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, X } from 'lucide-react';
 import { api, GROUPS, type Group, type MosquePage as MosqueData, type Standing, type Win } from '../api';
 import { Eyebrow, Field, LinkRow, Loading, Problem, Qr, Scanner, Screen, Seg, Sheet, useAction, useToast } from '../ui';
 import { addDays, niceDate, plural, timeIn, useLoad } from '../lib/util';
@@ -58,6 +58,7 @@ export function ManagePage() {
       <section className="card tight">
         <LinkRow to={`/manage/${id}/list`} icon={<ClipboardList size={19} />} title="Attendance list" sub="Tick children and anyone without a phone" />
         <LinkRow to={`/manage/${id}/print`} icon={<Printer size={19} />} title="Poster and member cards" sub="Print a QR poster, and a card for each child" />
+        {admin && <LinkRow to={`/manage/${id}/sponsors`} icon={<HandHeart size={19} />} title="Sponsors" sub="People offering prizes, breakfast or funds" />}
         {admin && <LinkRow to={`/challenge/new?scope=mosque:${id}`} icon={<Trophy size={19} />} title="New challenge" sub="Set the dates and the prizes" />}
         <button className="item" onClick={exportCsv}>
           <span className="icon"><Download size={19} /></span>
@@ -131,16 +132,39 @@ export function AttendancePage() {
     }
   };
 
+  // Type a name: if it is not on the list yet, add it and mark it here in one tap.
+  const typed = q.trim();
+  const known = (data?.people ?? []).some((p) => p.name.toLowerCase() === typed.toLowerCase());
+  const quickAdd = async (g: Group) => {
+    try {
+      const r = await api<{ id: string }>(`/mosques/${id}/roster`, { body: { name: typed, grp: g } });
+      await api(`/mosques/${id}/mark`, { body: { striverId: r.id, date: data!.date } });
+      toast(`${typed} is added and marked here`);
+      setQ('');
+      reload();
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  };
+
   const count = data?.people.filter((p) => p.here).length ?? 0;
   return (
     <Screen title="Attendance list" eyebrow={data ? niceDate(data.date, { weekday: 'long', day: 'numeric', month: 'long' }) : ''} back={`/manage/${id}`}
       action={<button className="iconbtn" aria-label="Scan a member card" onClick={() => setSheet('scan')}><ScanLine size={19} /></button>}>
       <Seg value={String(back)} onChange={(v) => setBack(Number(v))} options={[{ value: '0', label: 'Today' }, { value: '1', label: 'Yesterday' }, { value: '2', label: '2 days ago' }]} />
       <div className="row">
-        <label className="field grow"><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a name" aria-label="Search a name" /></label>
+        <label className="field grow"><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a name" aria-label="Type a name" /></label>
         <button className="btn soft" onClick={() => setSheet('add')}><UserPlus size={18} /> Add</button>
       </div>
       <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: 'Everyone' }, ...GROUPS.map((g) => ({ value: g, label: g[0].toUpperCase() + g.slice(1) }))]} />
+      {data && typed.length >= 2 && !known && people.length === 0 && (
+        <div className="note">
+          <b>“{typed}”</b> is not on the list. Add and mark here as:
+          <div className="row" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+            {GROUPS.map((g) => <button key={g} className="btn sm" onClick={() => quickAdd(g)}>{g[0].toUpperCase() + g.slice(1)}</button>)}
+          </div>
+        </div>
+      )}
       <section className="card">
         <div className="between" style={{ marginBottom: 6 }}>
           <Eyebrow icon={<ClipboardList size={15} />}>{plural(count, 'person', 'people')} here</Eyebrow>
@@ -165,6 +189,12 @@ export function AttendancePage() {
           <div className="empty"><b>{data.people.length ? 'No one matches' : 'The list is empty'}</b>Add children and anyone without a phone. People with the app appear here once this is their home mosque.</div>
         )}
       </section>
+      {data && typed.length >= 2 && !known && people.length > 0 && (
+        <p className="muted small">
+          Someone else? Add “{typed}” and mark here as{' '}
+          {GROUPS.map((g, i) => <span key={g}>{i > 0 && ', '}<button className="btn soft sm" onClick={() => quickAdd(g)}>{g[0].toUpperCase() + g.slice(1)}</button></span>)}
+        </p>
+      )}
       {sheet === 'add' && <AddPerson mosqueId={id!} onClose={() => setSheet(null)} onAdded={() => { setSheet(null); reload(); }} />}
       {sheet === 'scan' && <CardScan mosqueId={id!} date={data?.date} onClose={() => { setSheet(null); reload(); }} />}
     </Screen>

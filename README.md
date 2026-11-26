@@ -11,7 +11,7 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 **Check-in**
 - A QR code on the mosque's screen that changes every 30 seconds.
 - A printed poster whose code only works while the phone is at the mosque.
-- An attendance list for children and anyone without a phone, and printed member cards a volunteer can scan.
+- An attendance list for children and anyone without a phone: type a name to tick it, or add and mark a new name in one tap, and printed member cards a volunteer can scan.
 - A parent checks in their children on the same scan.
 - Open only around Fajr: from shortly before the adhan until sunrise, worked out from the mosque's location.
 - One check-in per person per Fajr, at any registered mosque.
@@ -22,6 +22,8 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 - Organisations that group several mosques under one leaderboard, with their own challenges and prizes.
 - A world leaderboard of approved mosques, by total check-ins or by consistency.
 - Squads of up to 10 friends inside a mosque.
+
+**Sponsors**: anyone can offer to sponsor, choose how (prizes, breakfast, funds, vouchers), and choose who may contact them: every mosque in their country, or one mosque. Only mosque and organisation admins see their contact details.
 
 **For each person**: streaks, a calendar, nine badges, family members, a share card, light and dark mode, hiding your name, deleting your account.
 

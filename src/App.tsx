@@ -14,6 +14,7 @@ import { ManagePage, AttendancePage, ScreenPage, PrintPage } from './pages/Manag
 import { MosqueSettings } from './pages/MosqueSettings';
 import { OwnerPage } from './pages/Owner';
 import { PrivacyPage, RulesPage } from './pages/Legal';
+import { MosqueSponsors, SponsorPage } from './pages/Sponsor';
 
 function Nav() {
   return (
@@ -65,6 +66,8 @@ export function App() {
         <Route path="/manage/:id/list" element={<AttendancePage />} />
         <Route path="/manage/:id/screen" element={<ScreenPage />} />
         <Route path="/manage/:id/print" element={<PrintPage />} />
+        <Route path="/manage/:id/sponsors" element={<MosqueSponsors />} />
+        <Route path="/sponsor" element={<SponsorPage />} />
         <Route path="/owner" element={<OwnerPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/rules" element={<RulesPage />} />

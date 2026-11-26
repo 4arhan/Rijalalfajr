@@ -294,6 +294,34 @@ describe('competition', () => {
     expect(list.json.mine.code).toBe(made.json.code);
   });
 
+  it('takes sponsor offers and shows them only to the people who run a mosque', async () => {
+    const shop = await signup('shop@example.com', 'Noor Cycles');
+    const offer = { name: 'Noor Cycles', email: 'hello@noorcycles.example', phone: '0121 000 000', country: 'united kingdom', city: 'Birmingham', kinds: ['prizes', 'breakfast'], note: 'Two bikes a year.' };
+    expect((await call('POST', '/sponsors', { body: { ...offer, scope: 'country' } })).status).toBe(401);
+    expect((await call('POST', '/sponsors', { token: shop.token, body: { ...offer, scope: 'mosque' } })).status).toBe(400);
+    expect((await call('POST', '/sponsors', { token: shop.token, body: { ...offer, kinds: [], scope: 'country' } })).status).toBe(400);
+    const wide = await call('POST', '/sponsors', { token: shop.token, body: { ...offer, scope: 'country' } });
+    expect(wide.status).toBe(200);
+    await call('POST', '/sponsors', { token: shop.token, body: { ...offer, name: 'Just for Leeds', scope: 'mosque', mosqueId: otherMosque } });
+    await call('POST', '/sponsors', { token: shop.token, body: { ...offer, name: 'Far away', country: 'Malaysia', scope: 'country' } });
+
+    const home = await call('GET', `/mosques/${mosqueId}/sponsors`, { token: admin.token });
+    expect(home.json.sponsors.map((x: any) => x.name)).toEqual(['Noor Cycles']);
+    expect(home.json.sponsors[0]).toMatchObject({ email: 'hello@noorcycles.example', kinds: ['prizes', 'breakfast'], scope: 'country' });
+    const leeds = await call('GET', `/mosques/${otherMosque}/sponsors`, { token: admin.token });
+    expect(leeds.json.sponsors.map((x: any) => x.name)).toEqual(['Just for Leeds', 'Noor Cycles']);
+    expect((await call('GET', `/mosques/${mosqueId}/sponsors`, { token: shop.token })).status).toBe(403);
+    expect((await call('GET', `/mosques/${mosqueId}/sponsors`)).status).toBe(401);
+
+    const mine = await call('GET', '/sponsors/mine', { token: shop.token });
+    expect(mine.json.sponsors).toHaveLength(3);
+    expect((await call('PUT', `/sponsors/${wide.json.id}`, { token: admin.token, body: { ...offer, scope: 'country' } })).status).toBe(404);
+    await call('DELETE', `/sponsors/${wide.json.id}`, { token: admin.token });
+    expect((await call('GET', '/sponsors/mine', { token: shop.token })).json.sponsors).toHaveLength(3);
+    await call('DELETE', `/sponsors/${wide.json.id}`, { token: shop.token });
+    expect((await call('GET', `/mosques/${mosqueId}/sponsors`, { token: admin.token })).json.sponsors).toHaveLength(0);
+  });
+
   it('deletes an account with its check-ins', async () => {
     const before = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`);
     expect(before.json.rows.some((r: any) => r.striverId === ali.self)).toBe(true);

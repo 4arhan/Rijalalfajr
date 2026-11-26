@@ -115,5 +115,16 @@ await db.query(
   `insert into challenges (id, scope_type, scope_id, name, start_date, end_date) values ($1,'org',$2,'Winter Fajr League',$3,$4)`,
   [newId(10), orgId, addDays(localDate(now, 'Europe/London'), -20), addDays(localDate(now, 'Europe/London'), 40)],
 );
+const offers: [string, string, string, string[], string, boolean][] = [
+  ['Noor Cycles', 'Birmingham', 'United Kingdom', ['prizes'], 'Two bicycles for each 40-day challenge.', true],
+  ['Baraka Bakery', 'Birmingham', 'United Kingdom', ['breakfast', 'vouchers'], 'Breakfast for up to 60 people on the last Friday of the month.', false],
+  ['The Rahman family', 'Leicester', 'United Kingdom', ['funds'], 'A contribution toward prizes for the children, in memory of our father.', false],
+];
+for (const [name, city, country, kinds, note, forHome] of offers) {
+  await db.query(
+    `insert into sponsors (id, user_id, name, email, phone, country, city, kinds, note, scope, mosque_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [newId(), userId, name, `hello@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`, '+44 121 000 0000', country, city, JSON.stringify(kinds), note, forHome ? 'mosque' : 'country', forHome ? homeId : null],
+  );
+}
 await db.close();
 console.log(`\nDemo account: ${demoEmail} / ${demoPassword}\nIts home mosque is ${MOSQUES[0].name} (${homeId}).`);
