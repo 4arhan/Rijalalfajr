@@ -152,7 +152,18 @@ export function createApp(opts: AppOptions) {
       return c.json({ error: { code: err.code, message: err.message, ...err.extra } }, err.status);
     }
     if (err instanceof NoDatabaseError || (err as Error).name === 'NoDatabaseError') {
-      return c.json({ error: { code: 'no_database', message: 'This site is not connected to its database yet. Please try again soon.' } }, 503);
+      // Enough to see why from outside, without giving anything away: which build this is,
+      // and whether any database variable reached it. No names or values.
+      const env = process.env;
+      const detail = {
+        build: (env.VERCEL_GIT_COMMIT_SHA ?? '').slice(0, 7),
+        environment: env.VERCEL_ENV ?? '',
+        hasDatabaseUrl: !!env.DATABASE_URL,
+        hasPostgresUrl: !!env.POSTGRES_URL,
+        postgresAddresses: Object.values(env).filter((v) => v && /^postgres(ql)?:\/\//.test(v)).length,
+        ownerSet: !!env.OWNER_EMAILS,
+      };
+      return c.json({ error: { code: 'no_database', message: 'This site is not connected to its database yet. Please try again soon.', detail } }, 503);
     }
     console.error(err);
     return c.json({ error: { code: 'server', message: 'Something went wrong on our side.' } }, 500);
