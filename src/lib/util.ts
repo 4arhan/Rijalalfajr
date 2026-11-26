@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
+import { dateLocale, t, tn } from './i18n';
 
 /** Load data for a screen, with reload. */
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[]) {
@@ -33,7 +34,7 @@ export function useNow(everyMs = 30000) {
 }
 
 export function timeIn(iso: string, timeZone: string) {
-  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
+  return new Intl.DateTimeFormat(dateLocale(), { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
 }
 
 export function untilText(iso: string, now: Date) {
@@ -45,7 +46,7 @@ export function untilText(iso: string, now: Date) {
 
 export function hijri(d = new Date()) {
   try {
-    return new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+    return new Intl.DateTimeFormat(`${dateLocale()}-ca-islamic-umalqura`, { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
   } catch {
     return '';
   }
@@ -53,7 +54,7 @@ export function hijri(d = new Date()) {
 
 export function niceDate(date: string, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) {
   const [y, m, d] = date.split('-').map(Number);
-  return new Intl.DateTimeFormat(undefined, { ...opts, timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
+  return new Intl.DateTimeFormat(dateLocale(), { ...opts, timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
 }
 
 export function addDays(date: string, n: number) {
@@ -69,8 +70,24 @@ export function initials(name: string) {
     .join('');
 }
 
+/** A count with its noun, in the chosen language: plural(3, 'day') gives "3 days". */
 export function plural(n: number, one: string, many = one + 's') {
-  return `${n} ${n === 1 ? one : many}`;
+  return tn(n, `{n} ${one}`, `{n} ${many}`);
+}
+
+/** The three age groups. A mosque can rename them; these are the names until it does. */
+export function groupName(g: string) {
+  return g === 'kids' ? t('Kids') : g === 'youth' ? t('Youth') : t('Adults');
+}
+
+/** A group label from the server: translated while it is still the default English one. */
+export function showLabel(label: string) {
+  return label === 'Kids' ? t('Kids') : label === 'Youth' ? t('Youth') : label === 'Adults' ? t('Adults') : label;
+}
+
+/** A name from a leaderboard: only the stand-in for a hidden name is translated. */
+export function showName(name: string) {
+  return name === 'Anonymous striver' ? t('Anonymous striver') : name;
 }
 
 export function distanceText(m: number) {
@@ -79,8 +96,8 @@ export function distanceText(m: number) {
 
 export function getPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('This device cannot share its location.'));
-    navigator.geolocation.getCurrentPosition(resolve, (e) => reject(new Error(e.code === 1 ? 'Location permission was refused.' : 'Could not find your location.')), {
+    if (!navigator.geolocation) return reject(new Error(t('This device cannot share its location.')));
+    navigator.geolocation.getCurrentPosition(resolve, (e) => reject(new Error(e.code === 1 ? t('Location permission was refused.') : t('Could not find your location.'))), {
       enableHighAccuracy: true,
       timeout: 15000,
       maximumAge: 30000,

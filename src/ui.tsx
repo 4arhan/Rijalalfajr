@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import { api, ApiError, getToken, setToken, type Me, type Standing } from './api';
-import { initials, plural } from './lib/util';
+import { initials, plural, showName } from './lib/util';
+import { t } from './lib/i18n';
 
 // ---------- session ----------
 
@@ -102,7 +103,7 @@ export function Screen(props: { title: string; eyebrow?: ReactNode; back?: strin
     <>
       <header className="topbar">
         {props.back && (
-          <button className="iconbtn" aria-label="Back" onClick={() => (props.back === true ? nav(-1) : nav(props.back as string))}>
+          <button className="iconbtn" aria-label={t('Back')} onClick={() => (props.back === true ? nav(-1) : nav(props.back as string))}>
             <ArrowLeft size={20} />
           </button>
         )}
@@ -120,7 +121,7 @@ export function Screen(props: { title: string; eyebrow?: ReactNode; back?: strin
 export function Loading() {
   return (
     <div className="center">
-      <div className="spinner" role="status" aria-label="Loading" />
+      <div className="spinner" role="status" aria-label={t('Loading')} />
     </div>
   );
 }
@@ -128,12 +129,12 @@ export function Loading() {
 export function Problem({ error, retry }: { error: { message: string }; retry?: () => void }) {
   return (
     <div className="card empty">
-      <b>That did not load</b>
+      <b>{t('That did not load')}</b>
       {error.message}
       {retry && (
         <div>
           <button className="btn ghost sm" onClick={retry}>
-            Try again
+            {t('Try again')}
           </button>
         </div>
       )}
@@ -224,7 +225,7 @@ export function useAction() {
       await fn();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.');
+      setError(e instanceof Error ? e.message : t('Something went wrong.'));
       return false;
     } finally {
       setBusy(false);
@@ -244,8 +245,8 @@ export function Podium({ rows, prizes }: { rows: Standing[]; prizes?: (string | 
         return (
           <div key={i} className={`place p${i + 1}`}>
             <div className="medal">{r ? initials(r.name) : '–'}</div>
-            <div className="who">{r?.name ?? 'Open'}</div>
-            <div className="days">{r ? plural(r.days, 'day') : 'No one yet'}</div>
+            <div className="who">{r ? showName(r.name) : t('Open')}</div>
+            <div className="days">{r ? plural(r.days, 'day') : t('No one yet')}</div>
             <div className="step">
               <b>{i + 1}</b>
               {prizes?.[i] && <span className="prize">{prizes[i]}</span>}
@@ -266,14 +267,14 @@ export function RankList({ rows, mine, from = 0 }: { rows: Standing[]; mine: Set
           <span className="avatar">{initials(r.name)}</span>
           <span className="grow">
             <b className="truncate" style={{ display: 'block' }}>
-              {r.name}
-              {mine.has(r.striverId) && <span className="muted"> · you</span>}
+              {showName(r.name)}
+              {mine.has(r.striverId) && <span className="muted">{' '}{t('· you')}</span>}
             </b>
-            <span className="sub">Best streak {r.bestStreak}</span>
+            <span className="sub">{t('Best streak {bestStreak}', { bestStreak: r.bestStreak })}</span>
           </span>
           <span className="score num">
             <b>{r.days}</b>
-            <small>{r.days === 1 ? 'day' : 'days'}</small>
+            <small>{r.days === 1 ? t('day') : t('days')}</small>
           </span>
         </div>
       ))}
@@ -286,7 +287,7 @@ export function Ring({ value, size = 104, children }: { value: number; size?: nu
   const c = 2 * Math.PI * r;
   return (
     <div className="ring" style={{ width: size, height: size }}>
-      <svg width={size} height={size} role="img" aria-label={`${Math.round(value * 100)} percent`}>
+      <svg width={size} height={size} role="img" aria-label={t('{n} percent', { n: Math.round(value * 100) })}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(168,240,207,.16)" strokeWidth="9" />
         <circle
           cx={size / 2}
@@ -373,7 +374,7 @@ export function Scanner({ onCode, paused }: { onCode: (text: string) => void; pa
     };
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setProblem('This browser cannot open the camera. Use your phone camera on the QR code instead.');
+      setProblem(t('This browser cannot open the camera. Use your phone camera on the QR code instead.'));
       return;
     }
     navigator.mediaDevices
@@ -387,7 +388,7 @@ export function Scanner({ onCode, paused }: { onCode: (text: string) => void; pa
         }
         tick();
       })
-      .catch(() => setProblem('The camera is blocked. Allow camera access, or scan the QR code with your phone camera.'));
+      .catch(() => setProblem(t('The camera is blocked. Allow camera access, or scan the QR code with your phone camera.')));
     return () => {
       stopped = true;
       clearTimeout(raf);

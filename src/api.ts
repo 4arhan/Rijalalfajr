@@ -1,4 +1,5 @@
 // Thin client for the API, with the response shapes the screens use.
+import { t } from './lib/i18n';
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string, public extra: Record<string, unknown> = {}) {
     super(message);
@@ -22,13 +23,14 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
       body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
     });
   } catch {
-    throw new ApiError(0, 'offline', 'No connection. Check your internet and try again.');
+    throw new ApiError(0, 'offline', t('No connection. Check your internet and try again.'));
   }
   if (opts.raw && res.ok) return (await res.blob()) as T;
   const json = await res.json().catch(() => null);
   if (!res.ok) {
     const e = json?.error ?? {};
-    throw new ApiError(res.status, e.code ?? 'error', e.message ?? 'Something went wrong.', e);
+    // The server answers in English; a sentence we have a translation for is shown translated.
+    throw new ApiError(res.status, e.code ?? 'error', t(e.message ?? 'Something went wrong.'), e);
   }
   return json as T;
 }

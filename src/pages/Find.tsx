@@ -4,6 +4,7 @@ import { BadgeCheck, Landmark, LocateFixed, Plus } from 'lucide-react';
 import { api } from '../api';
 import { Loading, Problem, Screen } from '../ui';
 import { distanceText, getPosition, plural, useLoad } from '../lib/util';
+import { t } from '../lib/i18n';
 
 interface Found { id: string; name: string; city: string; country: string; verified: boolean; members: number; distanceM: number | null }
 
@@ -33,11 +34,11 @@ export function FindPage() {
     setLocating(false);
   };
   return (
-    <Screen title="Find a mosque" back>
+    <Screen title={t('Find a mosque')} back>
       <label className="field">
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, city or country" aria-label="Search mosques" />
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Search by name, city or country')} aria-label={t('Search mosques')} />
       </label>
-      <button className="btn ghost" onClick={locate} disabled={locating}><LocateFixed size={18} /> {pos ? 'Sorted by distance' : locating ? 'Finding you' : 'Mosques near me'}</button>
+      <button className="btn ghost" onClick={locate} disabled={locating}><LocateFixed size={18} /> {pos ? t('Sorted by distance') : locating ? t('Finding you') : t('Mosques near me')}</button>
       {locError && <div className="note err">{locError}</div>}
       <section className="card tight">
         {error ? <Problem error={error} retry={reload} /> : !data ? <Loading /> : data.mosques.length ? (
@@ -46,7 +47,7 @@ export function FindPage() {
               <Link key={m.id} to={`/m/${m.id}`} className="item">
                 <span className="icon"><Landmark size={19} /></span>
                 <span className="grow">
-                  <b className="truncate" style={{ display: 'block' }}>{m.name} {m.verified && <BadgeCheck size={14} style={{ verticalAlign: '-2px' }} aria-label="Approved" />}</b>
+                  <b className="truncate" style={{ display: 'block' }}>{m.name} {m.verified && <BadgeCheck size={14} style={{ verticalAlign: '-2px' }} aria-label={t('Approved')} />}</b>
                   <span className="sub">{[m.city, m.country].filter(Boolean).join(', ')} · {plural(m.members, 'member')}</span>
                 </span>
                 {m.distanceM !== null && <span className="pill grey">{distanceText(m.distanceM)}</span>}
@@ -54,10 +55,10 @@ export function FindPage() {
             ))}
           </div>
         ) : (
-          <div className="empty"><b>No mosque found</b>Is yours missing? Register it and start its leaderboard.</div>
+          <div className="empty"><b>{t('No mosque found')}</b>{t('Is yours missing? Register it and start its leaderboard.')}</div>
         )}
       </section>
-      <Link to="/new-mosque" className="btn soft"><Plus size={18} /> Register a mosque</Link>
+      <Link to="/new-mosque" className="btn soft"><Plus size={18} />{' '}{t('Register a mosque')}</Link>
     </Screen>
   );
 }

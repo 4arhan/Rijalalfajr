@@ -18,15 +18,16 @@ import { PrivacyPage, RulesPage } from './pages/Legal';
 import { MosqueSponsors, SponsorPage } from './pages/Sponsor';
 import { BuddiesPage, KidsPage, ReviewPage } from './pages/Personal';
 import { CertificatesPage, ClassPage, ClassesPage, EmbedPage } from './pages/Community';
+import { t } from './lib/i18n';
 
 function Nav() {
   return (
-    <nav className="nav" aria-label="Main">
-      <NavLink to="/" end aria-label="Today"><Sunrise size={21} /><span>Today</span></NavLink>
-      <NavLink to="/mosque" aria-label="Mosque"><Landmark size={21} /><span>Mosque</span></NavLink>
-      <NavLink to="/checkin" className={({ isActive }) => `scan${isActive ? ' active' : ''}`} aria-label="Check in"><ScanLine size={22} /></NavLink>
-      <NavLink to="/world" aria-label="World"><Globe size={21} /><span>World</span></NavLink>
-      <NavLink to="/me" aria-label="Me"><User size={21} /><span>Me</span></NavLink>
+    <nav className="nav" aria-label={t('Main')}>
+      <NavLink to="/" end aria-label={t('Today')}><Sunrise size={21} /><span>{t('Today')}</span></NavLink>
+      <NavLink to="/mosque" aria-label={t('Mosque')}><Landmark size={21} /><span>{t('Mosque')}</span></NavLink>
+      <NavLink to="/checkin" className={({ isActive }) => `scan${isActive ? ' active' : ''}`} aria-label={t('Check in')}><ScanLine size={22} /></NavLink>
+      <NavLink to="/world" aria-label={t('World')}><Globe size={21} /><span>{t('World')}</span></NavLink>
+      <NavLink to="/me" aria-label={t('Me')}><User size={21} /><span>{t('Me')}</span></NavLink>
     </nav>
   );
 }
@@ -52,8 +53,8 @@ function GuestBar() {
   const loc = useLocation();
   return (
     <div className="guestbar">
-      <span><b>Rijal al-Fajr</b><small>Check in for Fajr and join the leaderboard</small></span>
-      <Link className="btn sm" to={`/join?next=${encodeURIComponent(loc.pathname)}`}>Join free</Link>
+      <span><b>Rijal al-Fajr</b><small>{t('Check in for Fajr and join the leaderboard')}</small></span>
+      <Link className="btn sm" to={`/join?next=${encodeURIComponent(loc.pathname)}`}>{t('Join free')}</Link>
     </div>
   );
 }

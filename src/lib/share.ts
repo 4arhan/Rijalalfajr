@@ -1,4 +1,5 @@
 // Draws a story-sized card (1080 x 1920) and hands it to the phone's share sheet.
+import { dateLocale, isRtl, t, tn } from './i18n';
 export interface CardData {
   name: string;
   streak: number;
@@ -28,6 +29,7 @@ export async function drawCard(d: CardData): Promise<Blob> {
   c.width = W;
   c.height = H;
   const x = c.getContext('2d')!;
+  x.direction = isRtl() ? 'rtl' : 'ltr';
   const font = (w: number, s: number) => `${w} ${s}px "Manrope Variable", system-ui, sans-serif`;
 
   const bg = x.createLinearGradient(0, 0, W * 0.4, H);
@@ -58,7 +60,7 @@ export async function drawCard(d: CardData): Promise<Blob> {
   x.font = font(300, 460);
   x.fillText(String(d.streak), W / 2, 830);
   x.font = font(700, 64);
-  x.fillText(d.streak === 1 ? 'dawn at the mosque' : 'dawns in a row', W / 2, 950);
+  x.fillText(d.streak === 1 ? t('dawn at the mosque') : t('dawns in a row'), W / 2, 950);
 
   x.fillStyle = '#b4ccc1';
   x.font = font(600, 50);
@@ -76,7 +78,7 @@ export async function drawCard(d: CardData): Promise<Blob> {
 
   x.fillStyle = '#b4ccc1';
   x.font = font(600, 38);
-  x.fillText('Pray Fajr at your mosque. Check in. Keep the streak.', W / 2, H - 190);
+  x.fillText(t('Pray Fajr at your mosque. Check in. Keep the streak.'), W / 2, H - 190);
   x.fillStyle = '#eef8f2';
   x.font = font(700, 40);
   x.fillText(location.host, W / 2, H - 120);
@@ -102,7 +104,7 @@ async function send(blob: Blob, text: string) {
 }
 
 export async function shareCard(d: CardData) {
-  await send(await drawCard(d), `${d.streak} dawns in a row at ${d.mosque}. #RijalAlFajr`);
+  await send(await drawCard(d), `${tn(d.streak, '{n} dawn in a row at {mosque}.', '{n} dawns in a row at {mosque}.', { mosque: d.mosque })} #RijalAlFajr`);
 }
 
 const FONT = (w: number, size: number) => `${w} ${size}px "Manrope Variable", system-ui, sans-serif`;
@@ -124,6 +126,7 @@ function backdrop(W: number, H: number) {
   x.fillStyle = glow;
   x.fillRect(0, 0, W, H);
   x.textAlign = 'center';
+  x.direction = isRtl() ? 'rtl' : 'ltr';
   return { c, x };
 }
 
@@ -138,7 +141,7 @@ export async function sharePoster(d: { mosque: string; place: string; podium: { 
   const { c, x } = backdrop(W, H);
   x.fillStyle = '#7beabc';
   x.font = FONT(700, 34);
-  x.fillText('F A J R   T H I S   W E E K', W / 2, 120);
+  x.fillText(t('Fajr this week').toUpperCase(), W / 2, 120);
   x.fillStyle = '#eef8f2';
   x.font = FONT(750, 70);
   wrap(x, d.mosque, W - 160).slice(0, 2).forEach((line, i) => x.fillText(line, W / 2, 220 + i * 78));
@@ -166,15 +169,15 @@ export async function sharePoster(d: { mosque: string; place: string; podium: { 
     x.fillText(String(col.i + 1), col.cx, base - col.h - 134);
     x.fillStyle = '#eef8f2';
     x.font = FONT(700, 34);
-    x.fillText(p ? wrap(x, p.name, 250)[0] : 'Open', col.cx, base - col.h - 56);
+    x.fillText(p ? wrap(x, p.name, 250)[0] : t('Open'), col.cx, base - col.h - 56);
     x.fillStyle = '#b4ccc1';
     x.font = FONT(600, 28);
-    x.fillText(p ? `${p.days} ${p.days === 1 ? 'day' : 'days'}` : '', col.cx, base - col.h - 18);
+    x.fillText(p ? tn(p.days, '{n} day', '{n} days') : '', col.cx, base - col.h - 18);
   }
   x.fillStyle = '#a8f0cf';
   x.fillRect(110, base, W - 220, 8);
 
-  const stats: [string, string][] = [[String(d.total), 'check-ins'], [String(d.average), 'a day on average'], [String(d.best), 'on the best day']];
+  const stats: [string, string][] = [[String(d.total), t('check-ins')], [String(d.average), t('a day on average')], [String(d.best), t('on the best day')]];
   stats.forEach(([n, label], i) => {
     const cx = 250 + i * 290;
     x.fillStyle = '#eef8f2';
@@ -186,8 +189,8 @@ export async function sharePoster(d: { mosque: string; place: string; podium: { 
   });
   x.fillStyle = '#7beabc';
   x.font = FONT(700, 34);
-  x.fillText('Join us at Fajr.  ' + location.host, W / 2, H - 80);
-  await send(await toBlob(c), `Fajr this week at ${d.mosque}. #RijalAlFajr`);
+  x.fillText(t('Join us at Fajr.') + '  ' + location.host, W / 2, H - 80);
+  await send(await toBlob(c), `${t('Fajr this week at {mosque}.', { mosque: d.mosque })} #RijalAlFajr`);
 }
 
 /** A story-sized summary of someone's year. */
@@ -198,12 +201,12 @@ export async function shareReview(d: { name: string; year: number; total: number
   const { c, x } = backdrop(W, H);
   x.fillStyle = '#7beabc';
   x.font = FONT(700, 40);
-  x.fillText(`M Y   ${d.year}   A T   F A J R`, W / 2, 230);
+  x.fillText(t('My {year} at Fajr', { year: d.year }).toUpperCase(), W / 2, 230);
   x.fillStyle = '#eef8f2';
   x.font = FONT(300, 400);
   x.fillText(String(d.total), W / 2, 720);
   x.font = FONT(700, 60);
-  x.fillText(d.total === 1 ? 'dawn at the mosque' : 'dawns at the mosque', W / 2, 830);
+  x.fillText(d.total === 1 ? t('dawn at the mosque') : t('dawns at the mosque'), W / 2, 830);
   x.fillStyle = '#b4ccc1';
   x.font = FONT(600, 46);
   x.fillText(d.name, W / 2, 920);
@@ -218,9 +221,9 @@ export async function shareReview(d: { name: string; year: number; total: number
     x.fillRect(left + i * bw + 8, 1300 - h, bw - 16, h);
     x.fillStyle = '#b4ccc1';
     x.font = FONT(600, 26);
-    x.fillText('JFMAMJJASOND'[i], left + i * bw + bw / 2, 1344);
+    x.fillText(new Intl.DateTimeFormat(dateLocale(), { month: 'narrow', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, i, 1))), left + i * bw + bw / 2, 1344);
   });
-  const facts: [string, string][] = [[String(d.best), 'best streak'], [String(d.mosques), d.mosques === 1 ? 'mosque' : 'mosques']];
+  const facts: [string, string][] = [[String(d.best), t('best streak')], [String(d.mosques), d.mosques === 1 ? t('mosque') : t('mosques')]];
   facts.forEach(([n, label], i) => {
     const cx = 330 + i * 420;
     x.fillStyle = '#eef8f2';
@@ -233,10 +236,10 @@ export async function shareReview(d: { name: string; year: number; total: number
   if (d.topMosque) {
     x.fillStyle = '#7beabc';
     x.font = FONT(600, 40);
-    x.fillText(wrap(x, `Mostly at ${d.topMosque}`, W - 200)[0], W / 2, 1700);
+    x.fillText(wrap(x, t('Mostly at {mosque}', { mosque: d.topMosque }), W - 200)[0], W / 2, 1700);
   }
   x.fillStyle = '#eef8f2';
   x.font = FONT(700, 38);
   x.fillText(location.host, W / 2, H - 110);
-  await send(await toBlob(c), `${d.total} dawns at the mosque in ${d.year}. #RijalAlFajr`);
+  await send(await toBlob(c), `${tn(d.total, '{n} dawn at the mosque in {year}.', '{n} dawns at the mosque in {year}.', { year: d.year })} #RijalAlFajr`);
 }

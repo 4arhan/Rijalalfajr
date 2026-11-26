@@ -36,7 +36,8 @@
   --r-card: 22px;
   --r-block: 14px;
   --col: 560px;
-  --font: 'Manrope Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font: 'Manrope Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Arabic', 'Geeza Pro', 'Noto Nastaliq Urdu',
+    'Noto Sans Bengali', 'Noto Sans Devanagari', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', Arial, sans-serif;
   color-scheme: light;
 }
 
@@ -262,7 +263,7 @@ a {
   font-weight: 600;
   letter-spacing: 0;
   color: var(--hero-ink-2);
-  margin-left: 6px;
+  margin-inline-start: 6px;
 }
 .hero .stats {
   display: grid;
@@ -272,8 +273,8 @@ a {
   border-top: 1px solid var(--hero-line);
 }
 .hero .stats div + div {
-  border-left: 1px solid var(--hero-line);
-  padding-left: 14px;
+  border-inline-start: 1px solid var(--hero-line);
+  padding-inline-start: 14px;
 }
 .hero .stats label {
   display: block;
@@ -296,7 +297,7 @@ a {
   border: 1px solid var(--hero-line);
   background: rgba(238, 248, 242, 0.06);
   color: var(--hero-ink);
-  text-align: left;
+  text-align: start;
   text-decoration: none;
   cursor: pointer;
 }
@@ -482,7 +483,7 @@ a {
   content: '';
   position: absolute;
   top: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -548,7 +549,7 @@ a {
   border-right: 0;
   border-bottom: 0;
   width: 100%;
-  text-align: left;
+  text-align: start;
 }
 button.item,
 a.item {
@@ -609,7 +610,7 @@ a.item {
   border-top-color: transparent;
 }
 .score {
-  text-align: right;
+  text-align: end;
   flex: none;
 }
 .score b {
@@ -1016,7 +1017,7 @@ a.item {
 .kiosk .close {
   position: absolute;
   top: 16px;
-  right: 16px;
+  inset-inline-end: 16px;
   background: rgba(238, 248, 242, 0.1);
   border-color: transparent;
   color: #eef8f2;
@@ -1243,6 +1244,50 @@ pre.snippet {
   padding: 0;
   border: 0;
   background: none;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
+}
+
+/* ---------- languages ---------- */
+/* Joined and non-Latin scripts must not be letter-spaced or forced to capitals. */
+:lang(ar) *,
+:lang(ur) *,
+:lang(fa) *,
+:lang(bn) *,
+:lang(hi) *,
+:lang(zh) * {
+  letter-spacing: 0 !important;
+}
+:lang(ar) .eyebrow,
+:lang(ur) .eyebrow,
+:lang(fa) .eyebrow,
+:lang(bn) .eyebrow,
+:lang(hi) .eyebrow,
+:lang(zh) .eyebrow {
+  text-transform: none;
+  font-size: 13px;
+}
+:lang(ar),
+:lang(ur),
+:lang(fa) {
+  line-height: 1.7;
+}
+:lang(bn),
+:lang(hi) {
+  line-height: 1.6;
+}
+/* Right to left: the switch knob travels the other way, and arrows that mean
+   "onward" or "back" point the other way. */
+[dir='rtl'] .switch input:checked::after {
+  transform: translateX(-20px);
+}
+[dir='rtl'] .flip,
+[dir='rtl'] .hero .cta i svg.lucide-arrow-right,
+[dir='rtl'] .item > svg.lucide-arrow-right,
+[dir='rtl'] .card.row > svg.lucide-arrow-right,
+[dir='rtl'] .iconbtn svg.lucide-arrow-left {
+  transform: scaleX(-1);
+}
+[dir='rtl'] .hero .big small {
+  margin-inline-start: 6px;
 }

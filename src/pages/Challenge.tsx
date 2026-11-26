@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Award, Gift, Pencil, Plus, ScrollText, Trash2, Trophy, Users } from 'lucide-react';
 import { api, DEFAULT_LABELS, GROUPS, type Group, type Labels, type Prize, type Standing } from '../api';
 import { Eyebrow, Field, Loading, Podium, Problem, RankList, Screen, Seg, Switch, useAction, useSession } from '../ui';
-import { addDays, niceDate, plural, useLoad } from '../lib/util';
+import { addDays, niceDate, plural, useLoad, showLabel, showName } from '../lib/util';
+import { t, tn } from '../lib/i18n';
 
 interface ChallengeData {
   challenge: {
@@ -19,7 +20,7 @@ interface ChallengeData {
 }
 
 const dayCount = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
-const ORDINAL = ['1st', '2nd', '3rd'];
+const ORDINAL = [t('1st'), t('2nd'), t('3rd')];
 
 export function ChallengePage() {
   const { id } = useParams();
@@ -37,8 +38,8 @@ export function ChallengePage() {
     return grp === 'all' ? all : all.filter((r) => r.grp === grp).map((r, i) => ({ ...r, rank: i + 1 }));
   }, [data, grp]);
 
-  if (error) return <Screen title="Challenge" back><Problem error={error} retry={reload} /></Screen>;
-  if (!data) return <Screen title="Challenge" back><Loading /></Screen>;
+  if (error) return <Screen title={t('Challenge')} back><Problem error={error} retry={reload} /></Screen>;
+  if (!data) return <Screen title={t('Challenge')} back><Loading /></Screen>;
   const ch = data.challenge;
   const total = dayCount(ch.startDate, ch.endDate);
   const day = Math.min(total, Math.max(0, dayCount(ch.startDate, data.today)));
@@ -46,19 +47,19 @@ export function ChallengePage() {
   const placePrize = (place: number) =>
     (data.prizes.find((p) => p.place === place && p.grp === grp) ?? data.prizes.find((p) => p.place === place && p.grp === 'all'))?.title;
   const milestones = data.prizes.filter((p) => p.milestoneDays !== null && (p.grp === 'all' || grp === 'all' || p.grp === grp));
-  const label = (g: Group | 'all') => (g === 'all' ? 'Everyone' : data.labels[g]);
+  const label = (g: Group | 'all') => (g === 'all' ? t('Everyone') : showLabel(data.labels[g]));
   const back = ch.scopeType === 'mosque' ? `/m/${ch.scopeId}` : `/org/${ch.scopeId}`;
 
   return (
     <Screen title={ch.name} eyebrow={ch.scopeName} back={back}
-      action={data.canEdit && <Link className="iconbtn" to={`/challenge/${ch.id}/edit`} aria-label="Edit challenge"><Pencil size={18} /></Link>}>
+      action={data.canEdit && <Link className="iconbtn" to={`/challenge/${ch.id}/edit`} aria-label={t('Edit challenge')}><Pencil size={18} /></Link>}>
       <section className="hero">
         <div className="between">
-          <Eyebrow icon={<Trophy size={15} />}>{ch.status === 'ended' ? 'Final podium' : ch.status === 'upcoming' ? 'Starts soon' : `Day ${day} of ${total}`}</Eyebrow>
-          <span className="muted small">{niceDate(ch.startDate)} to {niceDate(ch.endDate)}</span>
+          <Eyebrow icon={<Trophy size={15} />}>{ch.status === 'ended' ? t('Final podium') : ch.status === 'upcoming' ? t('Starts soon') : t('Day {day} of {total}', { day: day, total: total })}</Eyebrow>
+          <span className="muted small">{t('{from} to {to}', { from: niceDate(ch.startDate), to: niceDate(ch.endDate) })}</span>
         </div>
         {ch.status === 'upcoming' ? (
-          <p className="muted" style={{ marginTop: 14 }}>Starts on {niceDate(ch.startDate, { weekday: 'long', day: 'numeric', month: 'long' })}. Every Fajr at the mosque from then on counts.</p>
+          <p className="muted" style={{ marginTop: 14 }}>{t('Starts on {date}. Every Fajr at the mosque from then on counts.', { date: niceDate(ch.startDate, { weekday: 'long', day: 'numeric', month: 'long' }) })}</p>
         ) : (
           <>
             <Podium rows={rows} prizes={[placePrize(1), placePrize(2), placePrize(3)]} />
@@ -67,11 +68,11 @@ export function ChallengePage() {
         )}
       </section>
 
-      <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: 'Everyone' }, ...GROUPS.map((g) => ({ value: g, label: data.labels[g] }))]} />
+      <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: t('Everyone') }, ...GROUPS.map((g) => ({ value: g, label: showLabel(data.labels[g]) }))]} />
 
       {data.prizes.length > 0 && (
         <section className="card">
-          <Eyebrow icon={<Gift size={15} />}>Prizes</Eyebrow>
+          <Eyebrow icon={<Gift size={15} />}>{t('Prizes')}</Eyebrow>
           <div className="list">
             {data.prizes.filter((p) => p.place !== null && (grp === 'all' || p.grp === 'all' || p.grp === grp)).map((p, i) => (
               <div className="item" key={`p${i}`}>
@@ -83,9 +84,9 @@ export function ChallengePage() {
               const reached = rows.filter((r) => r.days >= p.milestoneDays! && (p.grp === 'all' || r.grp === p.grp)).length;
               return (
                 <div className="item" key={`m${i}`}>
-                  <span className="pill">{p.milestoneDays} days</span>
+                  <span className="pill">{t('{milestoneDays} days', { milestoneDays: p.milestoneDays })}</span>
                   <span className="grow"><b>{p.title}</b><span className="sub" style={{ display: 'block' }}>{[label(p.grp), p.detail, p.sponsor && `Given by ${p.sponsor}`].filter(Boolean).join(' · ')}</span></span>
-                  <span className="sub num">{reached} reached</span>
+                  <span className="sub num">{t('{reached} reached', { reached: reached })}</span>
                 </div>
               );
             })}
@@ -95,41 +96,37 @@ export function ChallengePage() {
 
       {ch.status === 'ended' && !data.hidden && data.rows.length > 0 && (
         <section className="card">
-          <Eyebrow icon={<Award size={15} />}>Winners</Eyebrow>
+          <Eyebrow icon={<Award size={15} />}>{t('Winners')}</Eyebrow>
           <div className="list">
             {GROUPS.filter((g) => data.rows.some((r) => r.grp === g)).map((g) => (
               <div className="item" key={g}>
                 <span className="grow">
-                  <b>{data.labels[g]}</b>
+                  <b>{showLabel(data.labels[g])}</b>
                   <span className="sub" style={{ display: 'block' }}>
-                    {data.rows.filter((r) => r.grp === g).slice(0, 3).map((r, i) => `${ORDINAL[i]} ${r.name} (${r.days})`).join(' · ')}
+                    {data.rows.filter((r) => r.grp === g).slice(0, 3).map((r, i) => `${ORDINAL[i]} ${showName(r.name)} (${r.days})`).join(' · ')}
                   </span>
                 </span>
               </div>
             ))}
           </div>
-          {me && <Link className="btn block" style={{ marginTop: 12 }} to={`/challenge/${ch.id}/certificates`}><Award size={18} /> {data.canEdit ? 'Print certificates' : 'My certificate'}</Link>}
+          {me && <Link className="btn block" style={{ marginTop: 12 }} to={`/challenge/${ch.id}/certificates`}><Award size={18} /> {data.canEdit ? t('Print certificates') : t('My certificate')}</Link>}
         </section>
       )}
 
-      {data.hidden && <div className="note">This mosque shows its standings to people who are signed in.</div>}
+      {data.hidden && <div className="note">{t('This mosque shows its standings to people who are signed in.')}</div>}
 
       {ch.status !== 'upcoming' && !data.hidden && (
         <section className="card">
-          <Eyebrow icon={<Users size={15} />}>Standings</Eyebrow>
-          {rows.length > 3 ? <RankList rows={rows} mine={mine} from={3} /> : <p className="muted small">{rows.length ? 'Everyone taking part is on the podium so far.' : 'No one has checked in during this challenge yet.'}</p>}
+          <Eyebrow icon={<Users size={15} />}>{t('Standings')}</Eyebrow>
+          {rows.length > 3 ? <RankList rows={rows} mine={mine} from={3} /> : <p className="muted small">{rows.length ? t('Everyone taking part is on the podium so far.') : t('No one has checked in during this challenge yet.')}</p>}
         </section>
       )}
 
       <section className="card">
-        <Eyebrow icon={<ScrollText size={15} />}>Rules</Eyebrow>
-        <p className="small">
-          One Fajr a day, checked in at the mosque. {ch.countAway ? 'Fajr at any registered mosque counts, so you keep your place when you travel.' : `Only Fajr prayed at ${ch.scopeType === 'mosque' ? ch.scopeName : 'the organisation’s mosques'} counts.`} Ranking is by days attended, then longest streak, then earliest arrival.
-        </p>
+        <Eyebrow icon={<ScrollText size={15} />}>{t('Rules')}</Eyebrow>
+        <p className="small">{[t('One Fajr a day, checked in at the mosque.'), ch.countAway ? t('Fajr at any registered mosque counts, so you keep your place when you travel.') : ch.scopeType === 'mosque' ? t('Only Fajr prayed at {mosque} counts.', { mosque: ch.scopeName }) : t('Only Fajr prayed at the organisation’s mosques counts.'), t('Ranking is by days attended, then longest streak, then earliest arrival.')].join(' ')}</p>
         {ch.rules && <p className="small" style={{ marginTop: 10, whiteSpace: 'pre-wrap' }}>{ch.rules}</p>}
-        <p className="muted small" style={{ marginTop: 10 }}>
-          Prizes are offered and handed out by {ch.scopeName}, not by Rijal al-Fajr. Apple and Google are not sponsors and are not involved in any way.
-        </p>
+        <p className="muted small" style={{ marginTop: 10 }}>{t('Prizes are offered and handed out by {scopeName}, not by Rijal al-Fajr. Apple and Google are not sponsors and are not involved in any way.', { scopeName: ch.scopeName })}</p>
       </section>
     </Screen>
   );
@@ -148,7 +145,7 @@ export function ChallengeEdit() {
     return type && sid ? { type, id: sid } : null;
   });
   const [labels, setLabels] = useState<Labels>(DEFAULT_LABELS);
-  const [name, setName] = useState('40 Days of Fajr');
+  const [name, setName] = useState(t('40 Days of Fajr'));
   const [startDate, setStart] = useState(addDays(today, 1));
   const [endDate, setEnd] = useState(addDays(today, 40));
   const [countAway, setCountAway] = useState(true);
@@ -185,61 +182,61 @@ export function ChallengeEdit() {
       nav(`/challenge/${r.id}`, { replace: true });
     });
 
-  if (!scope && !id) return <Screen title="New challenge" back><div className="note err">Open this from a mosque or organisation you manage.</div></Screen>;
-  if (!loaded) return <Screen title="Challenge" back>{act.error ? <div className="note err">{act.error}</div> : <Loading />}</Screen>;
+  if (!scope && !id) return <Screen title={t('New challenge')} back><div className="note err">{t('Open this from a mosque or organisation you manage.')}</div></Screen>;
+  if (!loaded) return <Screen title={t('Challenge')} back>{act.error ? <div className="note err">{act.error}</div> : <Loading />}</Screen>;
 
   return (
-    <Screen title={id ? 'Edit challenge' : 'New challenge'} back>
+    <Screen title={id ? t('Edit challenge') : t('New challenge')} back>
       <section className="card form">
-        <Field label="Name"><input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></Field>
+        <Field label={t('Name')}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} /></Field>
         <div className="grid2">
-          <Field label="First day"><input type="date" value={startDate} onChange={(e) => setStart(e.target.value)} /></Field>
-          <Field label="Last day"><input type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} /></Field>
+          <Field label={t('First day')}><input type="date" value={startDate} onChange={(e) => setStart(e.target.value)} /></Field>
+          <Field label={t('Last day')}><input type="date" value={endDate} onChange={(e) => setEnd(e.target.value)} /></Field>
         </div>
-        {endDate >= startDate && <p className="muted small">{plural(dayCount(startDate, endDate), 'day')} of Fajr.</p>}
-        <Switch label="Count Fajr at other mosques" hint="People keep their place when they travel." checked={countAway} onChange={setCountAway} />
-        <Field label="Extra rules (optional)" hint="For example who can take part and when prizes are handed out."><textarea value={rules} onChange={(e) => setRules(e.target.value)} maxLength={2000} /></Field>
+        {endDate >= startDate && <p className="muted small">{tn(dayCount(startDate, endDate), '{n} day of Fajr.', '{n} days of Fajr.')}</p>}
+        <Switch label={t('Count Fajr at other mosques')} hint={t('People keep their place when they travel.')} checked={countAway} onChange={setCountAway} />
+        <Field label={t('Extra rules (optional)')} hint={t('For example who can take part and when prizes are handed out.')}><textarea value={rules} onChange={(e) => setRules(e.target.value)} maxLength={2000} /></Field>
       </section>
 
       <section className="card form">
         <div className="between">
-          <Eyebrow icon={<Gift size={15} />}>Prizes</Eyebrow>
+          <Eyebrow icon={<Gift size={15} />}>{t('Prizes')}</Eyebrow>
           {prizes.length === 0 && (
-            <button className="btn soft sm" onClick={() => setPrizes([1, 2, 3].map((place) => blank({ place })))}>Add 1st, 2nd, 3rd</button>
+            <button className="btn soft sm" onClick={() => setPrizes([1, 2, 3].map((place) => blank({ place })))}>{t('Add 1st, 2nd, 3rd')}</button>
           )}
         </div>
         {prizes.map((p, i) => (
           <div key={i} className="form" style={{ paddingTop: 12, borderTop: '1px solid var(--line)' }}>
             <div className="grid2">
-              <Field label="Prize for">
+              <Field label={t('Prize for')}>
                 <select value={p.kind === 'place' ? `p${p.place}` : 'days'}
                   onChange={(e) => (e.target.value === 'days' ? edit(i, { kind: 'days' }) : edit(i, { kind: 'place', place: Number(e.target.value.slice(1)) }))}>
-                  <option value="p1">1st place</option><option value="p2">2nd place</option><option value="p3">3rd place</option><option value="days">Reaching a number of days</option>
+                  <option value="p1">{t('1st place')}</option><option value="p2">{t('2nd place')}</option><option value="p3">{t('3rd place')}</option><option value="days">{t('Reaching a number of days')}</option>
                 </select>
               </Field>
-              <Field label="Group">
+              <Field label={t('Group')}>
                 <select value={p.grp} onChange={(e) => edit(i, { grp: e.target.value as Draft['grp'] })}>
-                  <option value="all">Everyone</option>{GROUPS.map((g) => <option key={g} value={g}>{labels[g]}</option>)}
+                  <option value="all">{t('Everyone')}</option>{GROUPS.map((g) => <option key={g} value={g}>{labels[g]}</option>)}
                 </select>
               </Field>
             </div>
-            {p.kind === 'days' && <Field label="Days needed"><input type="number" min={1} max={366} value={p.milestoneDays} onChange={(e) => edit(i, { milestoneDays: Number(e.target.value) })} /></Field>}
-            <Field label="Prize"><input value={p.title} onChange={(e) => edit(i, { title: e.target.value })} maxLength={80} placeholder="e.g. Bicycle" /></Field>
+            {p.kind === 'days' && <Field label={t('Days needed')}><input type="number" min={1} max={366} value={p.milestoneDays} onChange={(e) => edit(i, { milestoneDays: Number(e.target.value) })} /></Field>}
+            <Field label={t('Prize')}><input value={p.title} onChange={(e) => edit(i, { title: e.target.value })} maxLength={80} placeholder={t('e.g. Bicycle')} /></Field>
             <div className="grid2">
-              <Field label="Given by (optional)"><input value={p.sponsor} onChange={(e) => edit(i, { sponsor: e.target.value })} maxLength={80} placeholder="Sponsor" /></Field>
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}><button className="btn danger block" onClick={() => setPrizes((ps) => ps.filter((_, j) => j !== i))}><Trash2 size={16} /> Remove</button></div>
+              <Field label={t('Given by (optional)')}><input value={p.sponsor} onChange={(e) => edit(i, { sponsor: e.target.value })} maxLength={80} placeholder={t('Sponsor')} /></Field>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}><button className="btn danger block" onClick={() => setPrizes((ps) => ps.filter((_, j) => j !== i))}><Trash2 size={16} />{' '}{t('Remove')}</button></div>
             </div>
           </div>
         ))}
-        <button className="btn ghost" onClick={() => setPrizes((ps) => [...ps, blank({ kind: ps.length ? 'days' : 'place' })])}><Plus size={17} /> Add a prize</button>
+        <button className="btn ghost" onClick={() => setPrizes((ps) => [...ps, blank({ kind: ps.length ? 'days' : 'place' })])}><Plus size={17} />{' '}{t('Add a prize')}</button>
       </section>
 
       {act.error && <div className="note err" role="alert">{act.error}</div>}
-      <button className="btn block" disabled={act.busy || name.trim().length < 2} onClick={save}>{id ? 'Save changes' : 'Create challenge'}</button>
+      <button className="btn block" disabled={act.busy || name.trim().length < 2} onClick={save}>{id ? t('Save changes') : t('Create challenge')}</button>
       {id && (
         <button className="btn danger block" disabled={act.busy}
-          onClick={() => confirm('Delete this challenge and its prizes?') && act.run(async () => { await api(`/challenges/${id}`, { method: 'DELETE' }); nav(scope!.type === 'mosque' ? `/manage/${scope!.id}` : `/org/${scope!.id}`, { replace: true }); })}>
-          Delete challenge
+          onClick={() => confirm(t('Delete this challenge and its prizes?')) && act.run(async () => { await api(`/challenges/${id}`, { method: 'DELETE' }); nav(scope!.type === 'mosque' ? `/manage/${scope!.id}` : `/org/${scope!.id}`, { replace: true }); })}>
+          {t('Delete challenge')}
         </button>
       )}
     </Screen>

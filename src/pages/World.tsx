@@ -4,6 +4,7 @@ import { CalendarRange, Globe, Search } from 'lucide-react';
 import { api } from '../api';
 import { Eyebrow, Loading, Problem, Screen, Seg, useSession } from '../ui';
 import { niceDate, plural, useLoad } from '../lib/util';
+import { t } from '../lib/i18n';
 
 interface Row { id: string; name: string; city: string; country: string; total: number; strivers: number; consistency: number | null }
 interface GroupRow { name: string; country: string; total: number; mosques: number }
@@ -26,45 +27,45 @@ export function WorldPage() {
   const top = data?.rows[0];
   const current = data?.seasons.find((s) => s.id === season);
   return (
-    <Screen title="World" eyebrow="Mosques competing in good" action={me && <Link className="iconbtn" to="/find" aria-label="Find a mosque"><Search size={19} /></Link>}>
+    <Screen title={t('World')} eyebrow={t('Mosques competing in good')} action={me && <Link className="iconbtn" to="/find" aria-label={t('Find a mosque')}><Search size={19} /></Link>}>
       <section className="hero">
-        <Eyebrow icon={<Globe size={15} />}>{current ? current.name : sort === 'total' ? 'Most Fajr check-ins' : 'Most consistent'}</Eyebrow>
+        <Eyebrow icon={<Globe size={15} />}>{current ? current.name : sort === 'total' ? t('Most Fajr check-ins') : t('Most consistent')}</Eyebrow>
         {top ? (
           <>
             <h2 style={{ fontSize: 26, fontWeight: 750, letterSpacing: '-0.02em', margin: '10px 0 2px' }}>{top.name}</h2>
             <p className="muted">{[top.city, top.country].filter(Boolean).join(', ')}</p>
             <div className="stats">
-              <div><label>Check-ins</label><b className="num">{top.total.toLocaleString()}</b></div>
-              <div><label>Strivers</label><b className="num">{top.strivers}</b></div>
-              <div><label>Consistency</label><b className="num">{top.consistency === null ? '–' : `${top.consistency}%`}</b></div>
+              <div><label>{t('Check-ins')}</label><b className="num">{top.total.toLocaleString()}</b></div>
+              <div><label>{t('Strivers')}</label><b className="num">{top.strivers}</b></div>
+              <div><label>{t('Consistency')}</label><b className="num">{top.consistency === null ? '–' : `${top.consistency}%`}</b></div>
             </div>
           </>
         ) : (
-          <p className="muted" style={{ marginTop: 10 }}>{data ? 'No approved mosque has check-ins in this period yet.' : 'Loading the leaderboard.'}</p>
+          <p className="muted" style={{ marginTop: 10 }}>{data ? t('No approved mosque has check-ins in this period yet.') : t('Loading the leaderboard.')}</p>
         )}
       </section>
 
       {data && data.seasons.length > 0 && (
         <section className="card">
-          <Eyebrow icon={<CalendarRange size={15} />}>Worldwide seasons</Eyebrow>
+          <Eyebrow icon={<CalendarRange size={15} />}>{t('Worldwide seasons')}</Eyebrow>
           <div className="list">
             {data.seasons.map((s) => (
               <button key={s.id} className="item" aria-pressed={season === s.id} onClick={() => setSeason(season === s.id ? null : s.id)}>
-                <span className="grow"><b>{s.name}</b><span className="sub" style={{ display: 'block' }}>{niceDate(s.startDate)} to {niceDate(s.endDate)}</span></span>
-                <span className={`pill${season === s.id ? '' : ' grey'}`}>{season === s.id ? 'Showing' : s.status === 'active' ? 'On now' : s.status === 'upcoming' ? 'Soon' : 'Ended'}</span>
+                <span className="grow"><b>{s.name}</b><span className="sub" style={{ display: 'block' }}>{t('{from} to {to}', { from: niceDate(s.startDate), to: niceDate(s.endDate) })}</span></span>
+                <span className={`pill${season === s.id ? '' : ' grey'}`}>{season === s.id ? t('Showing') : s.status === 'active' ? t('On now') : s.status === 'upcoming' ? t('Soon') : t('Ended')}</span>
               </button>
             ))}
           </div>
         </section>
       )}
 
-      {!season && <Seg value={period} onChange={setPeriod} options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'all', label: 'All time' }]} />}
-      <Seg value={view} onChange={setView} options={[{ value: 'mosque', label: 'Mosques' }, { value: 'city', label: 'Cities' }, { value: 'country', label: 'Countries' }]} />
-      {view === 'mosque' && <Seg value={sort} onChange={setSort} options={[{ value: 'total', label: 'Biggest jama‘ah' }, { value: 'consistency', label: 'Most consistent' }]} />}
+      {!season && <Seg value={period} onChange={setPeriod} options={[{ value: 'week', label: t('Week') }, { value: 'month', label: t('Month') }, { value: 'all', label: t('All time') }]} />}
+      <Seg value={view} onChange={setView} options={[{ value: 'mosque', label: t('Mosques') }, { value: 'city', label: t('Cities') }, { value: 'country', label: t('Countries') }]} />
+      {view === 'mosque' && <Seg value={sort} onChange={setSort} options={[{ value: 'total', label: t('Biggest jama‘ah') }, { value: 'consistency', label: t('Most consistent') }]} />}
       {view !== 'country' && data && data.countries.length > 1 && (
         <label className="field">
-          <select value={country} onChange={(e) => setCountry(e.target.value)} aria-label="Country">
-            <option value="">All countries</option>
+          <select value={country} onChange={(e) => setCountry(e.target.value)} aria-label={t('Country')}>
+            <option value="">{t('All countries')}</option>
             {data.countries.map((c) => <option key={c}>{c}</option>)}
           </select>
         </label>
@@ -83,12 +84,12 @@ export function WorldPage() {
                   </span>
                   <span className="score num">
                     <b>{sort === 'total' ? r.total.toLocaleString() : r.consistency === null ? '–' : `${r.consistency}%`}</b>
-                    <small>{sort === 'total' ? 'check-ins' : 'show up'}</small>
+                    <small>{sort === 'total' ? t('check-ins') : t('show up')}</small>
                   </span>
                 </Link>
               ))}
             </div>
-          ) : <div className="empty"><b>Nothing here yet</b>Mosques appear once they are approved and have check-ins.</div>
+          ) : <div className="empty"><b>{t('Nothing here yet')}</b>{t('Mosques appear once they are approved and have check-ins.')}</div>
         ) : data.groups.length ? (
           <div className="list">
             {data.groups.map((g, i) => (
@@ -98,15 +99,15 @@ export function WorldPage() {
                   <b className="truncate" style={{ display: 'block' }}>{g.name}</b>
                   <span className="sub">{view === 'city' ? `${g.country} · ` : ''}{plural(g.mosques, 'mosque')}</span>
                 </span>
-                <span className="score num"><b>{g.total.toLocaleString()}</b><small>check-ins</small></span>
+                <span className="score num"><b>{g.total.toLocaleString()}</b><small>{t('check-ins')}</small></span>
               </div>
             ))}
           </div>
-        ) : <div className="empty"><b>Nothing here yet</b>{view === 'city' ? 'Cities' : 'Countries'} appear once their mosques have check-ins.</div>}
+        ) : <div className="empty"><b>{t('Nothing here yet')}</b>{view === 'city' ? t('Cities appear once their mosques have check-ins.') : t('Countries appear once their mosques have check-ins.')}</div>}
       </section>
       {view === 'mosque' && (
         <p className="muted small">
-          Consistency is the share of a mosque's strivers who show up each day, for mosques with at least 5 strivers. It lets a small mosque beat a big one.
+          {t('Consistency is the share of a mosque\'s strivers who show up each day, for mosques with at least 5 strivers. It lets a small mosque beat a big one.')}
         </p>
       )}
     </Screen>

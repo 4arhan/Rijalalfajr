@@ -12,7 +12,8 @@
   --d-ink: #eef8f2;
   --d-ink-2: #b4ccc1;
   --d-line: rgba(168, 240, 207, 0.18);
-  --font: 'Manrope Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font: 'Manrope Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Arabic', 'Geeza Pro', 'Noto Sans Bengali',
+    'Noto Sans Devanagari', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', Arial, sans-serif;
 }
 * {
   box-sizing: border-box;
@@ -98,7 +99,7 @@ a {
 .bar nav {
   display: flex;
   gap: 24px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .bar nav a {
   text-decoration: none;
@@ -262,7 +263,8 @@ h1 em {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 16px 9px 13px;
+  padding-block: 9px;
+  padding-inline: 13px 16px;
   border-radius: 14px;
   border: 1px solid var(--d-line);
   background: rgba(238, 248, 242, 0.05);
@@ -346,10 +348,10 @@ h1 em {
 }
 .fact-grid div {
   padding: 26px 24px;
-  border-left: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
 }
 .fact-grid div:first-child {
-  border-left: 0;
+  border-inline-start: 0;
 }
 .fact-grid b {
   display: block;
@@ -440,7 +442,7 @@ h1 em {
   gap: 8px;
 }
 .tabs button {
-  text-align: left;
+  text-align: start;
   font: inherit;
   color: var(--d-ink-2);
   background: transparent;
@@ -532,7 +534,8 @@ summary:focus-visible {
 .faq summary {
   cursor: pointer;
   list-style: none;
-  padding: 20px 36px 20px 0;
+  padding-block: 20px;
+  padding-inline: 0 36px;
   font-weight: 700;
   font-size: 19px;
   position: relative;
@@ -543,7 +546,7 @@ summary:focus-visible {
 .faq summary::after {
   content: '+';
   position: absolute;
-  right: 4px;
+  inset-inline-end: 4px;
   top: 14px;
   font-size: 28px;
   font-weight: 400;
@@ -603,7 +606,7 @@ summary:focus-visible {
     margin: 0 16px;
   }
   .fact-grid div:nth-child(3) {
-    border-left: 0;
+    border-inline-start: 0;
   }
   .fact-grid div:nth-child(n + 3) {
     border-top: 1px solid var(--line);
@@ -669,5 +672,66 @@ summary:focus-visible {
   }
   #tour-shot {
     transition: none;
+  }
+}
+
+/* ---------- languages ---------- */
+.lang {
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--d-ink);
+  background: rgba(238, 248, 242, 0.08);
+  border: 1px solid var(--d-line);
+  border-radius: 999px;
+  min-height: 40px;
+  padding: 0 12px;
+  max-width: 150px;
+}
+.lang option {
+  color: #0f1a15;
+}
+:lang(ar) *,
+:lang(ur) *,
+:lang(fa) *,
+:lang(bn) *,
+:lang(hi) *,
+:lang(zh) * {
+  letter-spacing: 0 !important;
+}
+:lang(ar) .eyebrow,
+:lang(ur) .eyebrow,
+:lang(fa) .eyebrow,
+:lang(bn) .eyebrow,
+:lang(hi) .eyebrow,
+:lang(zh) .eyebrow {
+  text-transform: none;
+  font-size: 15px;
+}
+:lang(ar) h1,
+:lang(ur) h1,
+:lang(fa) h1,
+:lang(bn) h1,
+:lang(hi) h1 {
+  line-height: 1.3;
+}
+:lang(ar) h2,
+:lang(ur) h2,
+:lang(fa) h2,
+:lang(bn) h2,
+:lang(hi) h2 {
+  line-height: 1.35;
+}
+[dir='rtl'] .btn span[aria-hidden] {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+@media (max-width: 480px) {
+  .lang {
+    max-width: 110px;
+    padding: 0 8px;
+  }
+  .brand {
+    font-size: 15px;
   }
 }
