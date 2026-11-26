@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "গত 40 দিনে {stars}টি তারা",
  "{startDate} to {endDate}": "{startDate} থেকে {endDate}",
  "{typed} is added and marked here": "{typed}-কে যোগ করে উপস্থিত চিহ্নিত করা হয়েছে",
- "{what} copied": "{what} কপি হয়েছে",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>“{name}”</b> তালিকায় নেই। যোগ করে উপস্থিত চিহ্নিত করুন, গ্রুপ:",
  "<b>{names}</b> nudged you: see you at Fajr.": "<b>{names}</b> আপনাকে ডাক দিয়েছেন: ফজরে দেখা হবে।",
  "<b>{progress}</b> of {target}": "{target}-এর মধ্যে <b>{progress}</b>",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "মসজিদে একটি ফজর দিয়েই আপনার স্ট্রিক শুরু।",
  "Your strongest month was <b>{month}</b>.": "আপনার সেরা মাস ছিল <b>{month}</b>।",
  "Your year fills in with every Fajr you check in.": "চেক-ইন করা প্রতিটি ফজরে আপনার বছর ভরে ওঠে।",
- "Youth": "কিশোর"
+ "Youth": "কিশোর",
+ "Code copied": "কোড কপি হয়েছে"
 }

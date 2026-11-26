@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "Звёзд за последние 40 дней: {stars}",
  "{startDate} to {endDate}": "{startDate} — {endDate}",
  "{typed} is added and marked here": "{typed}: добавлено в список и отмечено",
- "{what} copied": "Скопировано: {what}",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>«{name}»</b> нет в списке. Добавить и отметить здесь в группе:",
  "<b>{names}</b> nudged you: see you at Fajr.": "Вам напомнили: <b>{names}</b>. Увидимся на фаджре.",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> из {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "Серия начинается с одного фаджра в мечети.",
  "Your strongest month was <b>{month}</b>.": "Ваш самый сильный месяц — <b>{month}</b>.",
  "Your year fills in with every Fajr you check in.": "Ваш год заполняется с каждым отмеченным фаджром.",
- "Youth": "Молодёжь"
+ "Youth": "Молодёжь",
+ "Code copied": "Код скопирован"
 }

@@ -39,9 +39,9 @@ export function timeIn(iso: string, timeZone: string) {
 
 export function untilText(iso: string, now: Date) {
   const mins = Math.max(0, Math.round((new Date(iso).getTime() - now.getTime()) / 60000));
+  const unit = (n: number, u: 'hour' | 'minute') => new Intl.NumberFormat(dateLocale(), { style: 'unit', unit: u, unitDisplay: 'narrow' }).format(n);
   const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h ? `${h}h ${m}m` : `${m}m`;
+  return h ? `${unit(h, 'hour')} ${unit(mins % 60, 'minute')}` : unit(mins, 'minute');
 }
 
 export function hijri(d = new Date()) {

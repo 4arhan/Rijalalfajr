@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "{stars} ستاره در 40 روز گذشته",
  "{startDate} to {endDate}": "{startDate} تا {endDate}",
  "{typed} is added and marked here": "{typed} اضافه شد و حضورش ثبت شد",
- "{what} copied": "{what} کپی شد",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>«{name}»</b> در فهرست نیست. افزودن و ثبت حضور در گروه:",
  "<b>{names}</b> nudged you: see you at Fajr.": "تلنگر از <b>{names}</b>: وعدهٔ ما نماز صبح.",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> از {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "زنجیره‌تان با یک نماز صبح در مسجد شروع می‌شود.",
  "Your strongest month was <b>{month}</b>.": "پربارترین ماهتان <b>{month}</b> بود.",
  "Your year fills in with every Fajr you check in.": "سالتان با هر نماز صبحی که ثبت می‌کنید پر می‌شود.",
- "Youth": "نوجوانان"
+ "Youth": "نوجوانان",
+ "Code copied": "کد کپی شد"
 }

@@ -223,7 +223,7 @@ export function ChallengeEdit() {
             {p.kind === 'days' && <Field label={t('Days needed')}><input type="number" min={1} max={366} value={p.milestoneDays} onChange={(e) => edit(i, { milestoneDays: Number(e.target.value) })} /></Field>}
             <Field label={t('Prize')}><input value={p.title} onChange={(e) => edit(i, { title: e.target.value })} maxLength={80} placeholder={t('e.g. Bicycle')} /></Field>
             <div className="grid2">
-              <Field label={t('Given by (optional)')}><input value={p.sponsor} onChange={(e) => edit(i, { sponsor: e.target.value })} maxLength={80} placeholder={t('Sponsor')} /></Field>
+              <Field label={t('Given by (optional)')}><input value={p.sponsor} onChange={(e) => edit(i, { sponsor: e.target.value })} maxLength={80} placeholder={t('e.g. Baraka Bakery')} /></Field>
               <div style={{ display: 'flex', alignItems: 'flex-end' }}><button className="btn danger block" onClick={() => setPrizes((ps) => ps.filter((_, j) => j !== i))}><Trash2 size={16} />{' '}{t('Remove')}</button></div>
             </div>
           </div>

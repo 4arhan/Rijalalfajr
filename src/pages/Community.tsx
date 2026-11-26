@@ -262,14 +262,14 @@ export function EmbedSheet({ mosqueId, onClose }: { mosqueId: string; onClose: (
   const toast = useToast();
   const link = `${location.origin}/m/${mosqueId}`;
   const code = `<iframe src="${location.origin}/embed/m/${mosqueId}" title="Fajr leaderboard" width="100%" height="620" style="border:0;max-width:520px"></iframe>`;
-  const copy = (text: string, what: string) => navigator.clipboard.writeText(text).then(() => toast(t('{what} copied', { what: what })), () => toast(t('Select the text and copy it')));
+  const copy = (text: string, done: string) => navigator.clipboard.writeText(text).then(() => toast(done), () => toast(t('Select the text and copy it')));
   return (
     <Sheet title={t('Share your leaderboard')} onClose={onClose}>
       <div className="form">
         <Field label={t('Link to your public page')} hint={t('Anyone can open it without an account. Names show as a first name and an initial.')}><pre className="snippet">{link}</pre></Field>
-        <button className="btn block" onClick={() => copy(link, 'Link')}><Copy size={17} />{' '}{t('Copy link')}</button>
+        <button className="btn block" onClick={() => copy(link, t('Link copied'))}><Copy size={17} />{' '}{t('Copy link')}</button>
         <Field label={t('Code for your mosque\'s website')} hint={t('Paste it into a page and the live podium appears there.')}><pre className="snippet">{code}</pre></Field>
-        <button className="btn ghost block" onClick={() => copy(code, 'Code')}><Copy size={17} />{' '}{t('Copy code')}</button>
+        <button className="btn ghost block" onClick={() => copy(code, t('Code copied'))}><Copy size={17} />{' '}{t('Copy code')}</button>
       </div>
     </Sheet>
   );

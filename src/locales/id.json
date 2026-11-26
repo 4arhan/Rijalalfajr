@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "{stars} bintang dalam 40 hari terakhir",
  "{startDate} to {endDate}": "{startDate} sampai {endDate}",
  "{typed} is added and marked here": "{typed} ditambahkan dan ditandai hadir",
- "{what} copied": "{what} disalin",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>“{name}”</b> belum ada di daftar. Tambah dan tandai hadir sebagai:",
  "<b>{names}</b> nudged you: see you at Fajr.": "<b>{names}</b> mencolekmu: sampai jumpa saat Subuh.",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> dari {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "Runtunanmu dimulai dengan satu Subuh di masjid.",
  "Your strongest month was <b>{month}</b>.": "Bulan terbaikmu adalah <b>{month}</b>.",
  "Your year fills in with every Fajr you check in.": "Tahunmu terisi seiring setiap check-in Subuhmu.",
- "Youth": "Remaja"
+ "Youth": "Remaja",
+ "Code copied": "Kode disalin"
 }

@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "{stars} estrellas en los últimos 40 días",
  "{startDate} to {endDate}": "Del {startDate} al {endDate}",
  "{typed} is added and marked here": "{typed}: añadido y marcado presente",
- "{what} copied": "{what} copiado",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>“{name}”</b> no está en la lista. Añadir y marcar presente como:",
  "<b>{names}</b> nudged you: see you at Fajr.": "Toque de <b>{names}</b>: nos vemos en el Fajr.",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> de {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "Tu racha empieza con un Fajr en la mezquita.",
  "Your strongest month was <b>{month}</b>.": "Tu mejor mes fue <b>{month}</b>.",
  "Your year fills in with every Fajr you check in.": "Tu año se va llenando con cada Fajr que registras.",
- "Youth": "Jóvenes"
+ "Youth": "Jóvenes",
+ "Code copied": "Código copiado"
 }

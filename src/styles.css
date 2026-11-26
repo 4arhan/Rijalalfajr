@@ -364,6 +364,12 @@ a {
   font-weight: 700;
   cursor: pointer;
   text-decoration: none;
+  text-align: center;
+  line-height: 1.25;
+  padding-block: 8px;
+}
+.btn.sm,
+.seg button {
   white-space: nowrap;
 }
 .btn.block {
@@ -1290,4 +1296,12 @@ pre.snippet {
 }
 [dir='rtl'] .hero .big small {
   margin-inline-start: 6px;
+}
+/* A Latin name inside right-to-left text keeps its own order ("Yusuf N.", not ".Yusuf N"). */
+[dir='rtl'] b,
+[dir='rtl'] h1,
+[dir='rtl'] h2,
+[dir='rtl'] h3,
+[dir='rtl'] .who {
+  unicode-bidi: plaintext;
 }

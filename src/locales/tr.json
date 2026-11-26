@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "Son 40 günde {stars} yıldız",
  "{startDate} to {endDate}": "{startDate} – {endDate}",
  "{typed} is added and marked here": "{typed} eklendi ve geldi olarak işaretlendi",
- "{what} copied": "{what} kopyalandı",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>“{name}”</b> listede yok. Şu grupla ekle ve geldi olarak işaretle:",
  "<b>{names}</b> nudged you: see you at Fajr.": "<b>{names}</b> seni dürttü: sabah namazında görüşürüz.",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> / {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "Serin, camide kılacağın bir sabah namazıyla başlar.",
  "Your strongest month was <b>{month}</b>.": "En güçlü ayın <b>{month}</b> oldu.",
  "Your year fills in with every Fajr you check in.": "Yılın, yoklama verdiğin her sabah namazıyla dolar.",
- "Youth": "Gençler"
+ "Youth": "Gençler",
+ "Code copied": "Kod kopyalandı"
 }

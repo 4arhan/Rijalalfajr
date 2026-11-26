@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "最近 40 天获得 {stars} 颗星",
  "{startDate} to {endDate}": "{startDate} 至 {endDate}",
  "{typed} is added and marked here": "已添加 {typed} 并标记到场",
- "{what} copied": "已复制 {what}",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "名单上没有<b>“{name}”</b>。添加并标记到场，组别：",
  "<b>{names}</b> nudged you: see you at Fajr.": "<b>{names}</b> 提醒了你：晨礼见。",
  "<b>{progress}</b> of {target}": "<b>{progress}</b> / {target}",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "连续记录从在清真寺的一次晨礼开始。",
  "Your strongest month was <b>{month}</b>.": "你表现最好的月份是 <b>{month}</b>。",
  "Your year fills in with every Fajr you check in.": "你每签到一次晨礼，这一年就多填上一格。",
- "Youth": "青少年"
+ "Youth": "青少年",
+ "Code copied": "已复制代码"
 }

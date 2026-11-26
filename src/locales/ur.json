@@ -41,7 +41,6 @@
  "{stars} stars in the last 40 days": "پچھلے 40 دنوں میں {stars} ستارے",
  "{startDate} to {endDate}": "{startDate} سے {endDate} تک",
  "{typed} is added and marked here": "{typed} کو شامل کر کے حاضر لگا دیا گیا",
- "{what} copied": "{what} کاپی ہو گیا",
  "<b>“{name}”</b> is not on the list. Add and mark here as:": "<b>“{name}”</b> فہرست میں نہیں ہے۔ شامل کریں اور حاضر لگائیں بطور:",
  "<b>{names}</b> nudged you: see you at Fajr.": "<b>{names}</b> نے آپ کو یاد دلایا: فجر میں ملتے ہیں۔",
  "<b>{progress}</b> of {target}": "{target} میں سے <b>{progress}</b>",
@@ -787,5 +786,6 @@
  "Your streak starts with one Fajr at the mosque.": "آپ کا تسلسل مسجد میں ایک فجر سے شروع ہوتا ہے۔",
  "Your strongest month was <b>{month}</b>.": "آپ کا سب سے مضبوط مہینہ <b>{month}</b> رہا۔",
  "Your year fills in with every Fajr you check in.": "ہر فجر کی حاضری کے ساتھ آپ کا سال بھرتا جاتا ہے۔",
- "Youth": "نوجوان"
+ "Youth": "نوجوان",
+ "Code copied": "کوڈ کاپی ہو گیا"
 }
