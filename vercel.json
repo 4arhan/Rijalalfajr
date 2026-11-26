@@ -4,6 +4,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/about", "destination": "/about/index.html" },
-    { "source": "/((?!api/|about/|assets/|.*\\.[a-z0-9]+$).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|about/).*)", "destination": "/index.html" }
   ]
 }

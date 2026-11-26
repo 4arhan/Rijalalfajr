@@ -10,6 +10,14 @@ export interface Db {
 
 const SCHEMA_VERSION = 3;
 
+/** Thrown on a hosted deployment that has no DATABASE_URL yet. */
+export class NoDatabaseError extends Error {
+  constructor() {
+    super('DATABASE_URL is not set');
+    this.name = 'NoDatabaseError';
+  }
+}
+
 const SCHEMA = `
 create table if not exists meta (key text primary key, value text not null);
 
@@ -290,8 +298,10 @@ async function openLite(dir?: string): Promise<Db> {
 }
 
 export async function openDb(opts: { url?: string; memory?: boolean } = {}): Promise<Db> {
-  const url = opts.url ?? process.env.DATABASE_URL;
+  // Vercel's Postgres integrations name the variable differently from one to the next.
+  const url = opts.url ?? process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
   let db: Db;
+  if (!url && !opts.memory && process.env.VERCEL) throw new NoDatabaseError();
   if (url && !opts.memory) db = await openPg(url);
   else db = await openLite(opts.memory ? undefined : process.env.PGLITE_DIR || '.data/pglite');
   await migrate(db);

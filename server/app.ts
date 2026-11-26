@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { z } from 'zod';
-import type { Db } from './db.js';
+import { NoDatabaseError, type Db } from './db.js';
 import {
   CALC_METHODS,
   addDays,
@@ -150,6 +150,9 @@ export function createApp(opts: AppOptions) {
   app.onError((err, c) => {
     if (err instanceof HttpError) {
       return c.json({ error: { code: err.code, message: err.message, ...err.extra } }, err.status);
+    }
+    if (err instanceof NoDatabaseError || (err as Error).name === 'NoDatabaseError') {
+      return c.json({ error: { code: 'no_database', message: 'This site is not connected to its database yet. Please try again soon.' } }, 503);
     }
     console.error(err);
     return c.json({ error: { code: 'server', message: 'Something went wrong on our side.' } }, 500);
