@@ -12,8 +12,9 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <script type="module" src="./about.ts"></script>
   </head>
-  <body>
+    <body>
     <a class="skip" href="#main">Skip to content</a>
+    <div class="progress" aria-hidden="true"><i id="progress"></i></div>
     <header class="bar">
       <div class="wrap bar-in">
         <a class="brand" href="/about/"><img src="/icon.svg" alt="" width="34" height="34" /> Rijal al-Fajr</a>
@@ -31,7 +32,14 @@
     </header>
 
     <main id="main">
+      <!-- ============ hero: the sky before dawn ============ -->
       <section class="hero dark">
+        <div class="sky" aria-hidden="true">
+          <div class="stars"></div>
+          <div class="stars far"></div>
+          <div class="sun"></div>
+          <div class="haze"></div>
+        </div>
         <div class="wrap hero-in">
           <div class="hero-copy">
             <p class="eyebrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v6M4.9 8.9l2.9 2.9M19.1 8.9l-2.9 2.9M2 18h20M6 18a6 6 0 0 1 12 0M8 22h8" /></svg> The men of Fajr</p>
@@ -48,44 +56,103 @@
             <p class="fine">Free, with no ads. Works in any phone browser today, with nothing to install.</p>
           </div>
           <div class="phones" aria-hidden="true">
+            <div class="halo"></div>
             <div class="phone left"><img src="/shots/mosque.webp" alt="" width="585" height="1200" /></div>
             <div class="phone right"><img src="/shots/done.webp" alt="" width="585" height="1200" /></div>
             <div class="phone mid"><img src="/shots/today.webp" alt="" width="585" height="1200" /></div>
           </div>
         </div>
+        <svg class="skyline" viewBox="0 0 1440 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+          <g fill="#06130f">
+            <rect x="0" y="196" width="1440" height="24" />
+            <!-- far town -->
+            <path d="M0 196v-34h46v-18h38v24h52v-40h30v40h44v-22h58v22h36v-52h26v52h62v-30h48v30h40v36z" opacity=".55" />
+            <path d="M1440 196v-40h-52v-22h-40v30h-46v-46h-28v46h-58v-26h-44v26h-50v-58h-24v58h-70v-28h-46v28h-34v32z" opacity=".55" />
+            <!-- minarets -->
+            <path d="M498 196V74l-5-6 9-34 9 34-5 6v122z" /><rect x="489" y="104" width="26" height="7" rx="2" /><rect x="491" y="140" width="22" height="6" rx="2" />
+            <path d="M934 196V74l-5-6 9-34 9 34-5 6v122z" /><rect x="925" y="104" width="26" height="7" rx="2" /><rect x="927" y="140" width="22" height="6" rx="2" />
+            <path d="M396 196v-84l-4-5 7-24 7 24-4 5v84z" /><path d="M1038 196v-84l-4-5 7-24 7 24-4 5v84z" />
+            <!-- prayer hall and domes -->
+            <rect x="540" y="136" width="360" height="60" />
+            <path d="M620 136a100 86 0 0 1 200 0z" />
+            <path d="M548 136a44 38 0 0 1 88 0z" /><path d="M804 136a44 38 0 0 1 88 0z" />
+            <rect x="430" y="158" width="110" height="38" /><rect x="900" y="158" width="110" height="38" />
+            <path d="M444 158a34 28 0 0 1 68 0z" /><path d="M928 158a34 28 0 0 1 68 0z" />
+            <rect x="718" y="30" width="4" height="22" />
+          </g>
+          <!-- crescent on the main dome -->
+          <path d="M727 20a9 9 0 1 1-10-8 7 7 0 1 0 10 8z" fill="#f0c066" />
+          <!-- lit doorway and windows -->
+          <g fill="#f0c066" opacity=".85">
+            <path d="M706 196v-30a14 14 0 0 1 28 0v30z" />
+            <path d="M592 196v-22a8 8 0 0 1 16 0v22zM640 196v-22a8 8 0 0 1 16 0v22zM784 196v-22a8 8 0 0 1 16 0v22zM832 196v-22a8 8 0 0 1 16 0v22z" opacity=".7" />
+          </g>
+        </svg>
       </section>
 
       <section class="facts">
         <div class="wrap fact-grid">
-          <div><b>30 s</b><span>how often the check-in code on the mosque screen changes</span></div>
-          <div><b>3</b><span>ways to check in: scan the code, show a card, or be ticked on the list</span></div>
-          <div><b>1</b><span>check-in per Fajr, at any registered mosque in the world</span></div>
-          <div><b>0</b><span>ads, fees or data sold. Children need no account at all</span></div>
+          <div class="reveal" style="--i:0"><b>30 s</b><span>how often the check-in code on the mosque screen changes</span></div>
+          <div class="reveal" style="--i:1"><b>3</b><span>ways to check in: scan the code, show a card, or be ticked on the list</span></div>
+          <div class="reveal" style="--i:2"><b>1</b><span>check-in per Fajr, at any registered mosque in the world</span></div>
+          <div class="reveal" style="--i:3"><b>0</b><span>ads, fees or data sold. Children need no account at all</span></div>
         </div>
       </section>
 
+      <!-- ============ how it works ============ -->
       <section id="how" class="wrap block">
         <p class="eyebrow">How it works</p>
         <h2>Arrive for Fajr. Scan. Watch your mosque rise.</h2>
         <div class="steps">
-          <article>
-            <span class="n">1</span>
+          <article class="reveal" style="--i:0">
+            <div class="step-top"><span class="n">1</span><span class="ico"><i data-lucide="qr-code"></i></span></div>
             <h3>The mosque puts up a code</h3>
             <p>An admin registers the mosque and opens the mosque screen on a tablet or TV by the entrance. It shows a QR code that changes every 30 seconds, so a forwarded screenshot is useless.</p>
           </article>
-          <article>
-            <span class="n">2</span>
+          <article class="reveal" style="--i:1">
+            <div class="step-top"><span class="n">2</span><span class="ico"><i data-lucide="scan-line"></i></span></div>
             <h3>You check in at dawn</h3>
             <p>Point your phone camera at the code. Check-in opens shortly before the adhan and closes at sunrise, worked out from the mosque's own location. Children are ticked on the attendance list or show a printed card.</p>
           </article>
-          <article>
-            <span class="n">3</span>
+          <article class="reveal" style="--i:2">
+            <div class="step-top"><span class="n">3</span><span class="ico"><i data-lucide="trophy"></i></span></div>
             <h3>The streak and the podium do the rest</h3>
             <p>Every dawn adds to your streak and your place on your mosque's leaderboard. Every check-in also counts for the mosque on the world leaderboard.</p>
           </article>
         </div>
       </section>
 
+      <!-- ============ three things, shown moving ============ -->
+      <section class="wrap showcase">
+        <article class="show reveal">
+          <div class="stage qr-stage" data-notranslate aria-hidden="true">
+            <div class="qr-frame"><div id="qr" class="qr"></div></div>
+            <svg class="qr-ring" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" /><circle id="qr-arc" cx="24" cy="24" r="20" /></svg>
+          </div>
+          <h3>The mosque screen</h3>
+          <p>A tablet or TV at the entrance shows the code, today's count against your goal and the latest names as they come in.</p>
+        </article>
+        <article class="show reveal" style="--i:1">
+          <div class="stage podium-stage" data-notranslate aria-hidden="true">
+            <div class="pod p2"><span class="who">SN</span><i>2</i></div>
+            <div class="pod p1"><span class="who">YN</span><i>1</i></div>
+            <div class="pod p3"><span class="who">MR</span><i>3</i></div>
+          </div>
+          <h3>A podium at every mosque</h3>
+          <p>First, second and third, for everyone or by group: Kids, Youth and Adults, or whatever names the mosque prefers. Ties go to the longest streak, then to whoever arrives earliest.</p>
+        </article>
+        <article class="show reveal" style="--i:2">
+          <div class="stage streak-stage" data-notranslate aria-hidden="true">
+            <svg class="streak-ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" /><circle id="streak-arc" cx="60" cy="60" r="50" /></svg>
+            <div class="streak-num"><b id="streak-n">0</b><small>/ 40</small></div>
+            <div class="week"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <h3>A streak that travels with you</h3>
+          <p>Pray Fajr at any registered mosque and it counts. Away for work or visiting family, you keep your streak and your place at your home mosque.</p>
+        </article>
+      </section>
+
+      <!-- ============ tour ============ -->
       <section id="tour" class="dark tour">
         <div class="wrap">
           <p class="eyebrow">Take the tour</p>
@@ -93,77 +160,90 @@
           <p class="sub">These are real screens from the app, filled with sample data.</p>
           <div class="tour-in">
             <div class="tabs" role="tablist" aria-label="App screens">
-              <button role="tab" aria-selected="true" data-shot="today"><b>Today</b><span>Your dawn streak, your weekly goal, your buddies, and what is on at your mosque after Fajr.</span></button>
-              <button role="tab" aria-selected="false" data-shot="family"><b>Check in</b><span>Scan once and choose who is with you. A parent checks in the children on the same scan.</span></button>
-              <button role="tab" aria-selected="false" data-shot="mosque"><b>Mosque</b><span>The podium: first, second and third, with the full leaderboard, by week, month or all time.</span></button>
-              <button role="tab" aria-selected="false" data-shot="challenge"><b>Challenge</b><span>40 days of Fajr with the prize for each place, set by the mosque, and rewards for reaching a number of days.</span></button>
-              <button role="tab" aria-selected="false" data-shot="world"><b>World</b><span>Mosques, cities and countries ranked across the world, by size of jama‘ah or by consistency.</span></button>
-              <button role="tab" aria-selected="false" data-shot="me"><b>Me</b><span>A calendar of your dawns, ten badges to earn, your family, your buddies and your year in review.</span></button>
+              <button role="tab" aria-selected="true" data-shot="today"><b>Today</b><span>Your dawn streak, your weekly goal, your buddies, and what is on at your mosque after Fajr.</span><i class="tick" aria-hidden="true"></i></button>
+              <button role="tab" aria-selected="false" data-shot="family"><b>Check in</b><span>Scan once and choose who is with you. A parent checks in the children on the same scan.</span><i class="tick" aria-hidden="true"></i></button>
+              <button role="tab" aria-selected="false" data-shot="mosque"><b>Mosque</b><span>The podium: first, second and third, with the full leaderboard, by week, month or all time.</span><i class="tick" aria-hidden="true"></i></button>
+              <button role="tab" aria-selected="false" data-shot="challenge"><b>Challenge</b><span>40 days of Fajr with the prize for each place, set by the mosque, and rewards for reaching a number of days.</span><i class="tick" aria-hidden="true"></i></button>
+              <button role="tab" aria-selected="false" data-shot="world"><b>World</b><span>Mosques, cities and countries ranked across the world, by size of jama‘ah or by consistency.</span><i class="tick" aria-hidden="true"></i></button>
+              <button role="tab" aria-selected="false" data-shot="me"><b>Me</b><span>A calendar of your dawns, ten badges to earn, your family, your buddies and your year in review.</span><i class="tick" aria-hidden="true"></i></button>
             </div>
-            <div class="phone solo"><img id="tour-shot" src="/shots/today.webp" alt="The Today screen of the app" width="585" height="1200" /></div>
+            <div class="tour-phone">
+              <div class="halo"></div>
+              <div class="phone solo"><img id="tour-shot" src="/shots/today.webp" alt="The Today screen of the app" width="585" height="1200" /></div>
+            </div>
           </div>
         </div>
       </section>
 
+      <!-- ============ features ============ -->
       <section id="features" class="wrap block">
         <p class="eyebrow">Features</p>
         <h2>Built around one prayer, and the people who come for it.</h2>
-        <div class="cards">
-          <article><h3>A streak that travels with you</h3><p>Pray Fajr at any registered mosque and it counts. Away for work or visiting family, you keep your streak and your place at your home mosque.</p></article>
-          <article><h3>A podium at every mosque</h3><p>First, second and third, for everyone or by group: Kids, Youth and Adults, or whatever names the mosque prefers. Ties go to the longest streak, then to whoever arrives earliest.</p></article>
-          <article><h3>Prizes the mosque decides</h3><p>A bicycle for first place among the kids, a medal for 40 days: the admin sets a prize for each place and for reaching a number of days, with the sponsor's name if there is one.</p></article>
-          <article><h3>Fajr buddies</h3><p>Pair up with a friend. Each of you sees whether the other made it to Fajr today, and can send a nudge.</p></article>
-          <article><h3>Bring a friend</h3><p>Share your invitation link. Whoever joins starts at your mosque, already your buddy. Bring three who come to Fajr and you earn a badge.</p></article>
-          <article><h3>A goal that fits your week</h3><p>If every dawn is not possible yet, set a goal such as five a week and watch it fill from Monday to Sunday.</p></article>
-          <article><h3>Children without phones</h3><p>A volunteer ticks names on the attendance list, or scans the printed card each child carries. A parent can also check in the whole family with one scan.</p></article>
-          <article><h3>A star chart for kids</h3><p>A simple view a child can own: one star for each dawn in the last 40 days, a big streak number and their own card to show at the door.</p></article>
-          <article><h3>Squads</h3><p>Up to 10 friends at one mosque who hold each other to Fajr, ranked by days per member. A join code is all it takes.</p></article>
-          <article><h3>Mosques, cities and countries</h3><p>The world leaderboard ranks approved mosques by total check-ins and by consistency, so a small mosque can beat a big one. The same numbers add up into city and country tables, and worldwide seasons such as a winter 40 days.</p></article>
-          <article><h3>Excused, not broken</h3><p>Ill or travelling where there is no registered mosque? Your mosque can excuse the day, and your streak carries on.</p></article>
-          <article><h3>Your year in review</h3><p>Your dawns month by month, your best streak and the mosques you prayed in, as a page and as an image to share.</p></article>
-          <article><h3>First in today</h3><p>Each morning the first three through the door are named on the mosque's page.</p></article>
-          <article><h3>Ten badges</h3><p>From First Dawn to Rijal al-Fajr, earned at 40 dawns in a row, plus Musafir for praying Fajr at three different mosques.</p></article>
-          <article><h3>In fifteen languages</h3><p>English, Arabic, Urdu, Persian, Turkish, Indonesian, Malay, Bengali, Hindi, French, Spanish, Portuguese, Russian, Chinese and Swahili, with right-to-left layout where the language needs it.</p></article>
-          <article><h3>A card for your story</h3><p>One tap draws your streak as an image sized for an Instagram story, ready to share.</p></article>
+        <div class="bento">
+          <article class="card wide reveal"><span class="ico"><i data-lucide="gift"></i></span><h3>Prizes the mosque decides</h3><p>A bicycle for first place among the kids, a medal for 40 days: the admin sets a prize for each place and for reaching a number of days, with the sponsor's name if there is one.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="heart-handshake"></i></span><h3>Fajr buddies</h3><p>Pair up with a friend. Each of you sees whether the other made it to Fajr today, and can send a nudge.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="send"></i></span><h3>Bring a friend</h3><p>Share your invitation link. Whoever joins starts at your mosque, already your buddy. Bring three who come to Fajr and you earn a badge.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="target"></i></span><h3>A goal that fits your week</h3><p>If every dawn is not possible yet, set a goal such as five a week and watch it fill from Monday to Sunday.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="clipboard-check"></i></span><h3>Children without phones</h3><p>A volunteer ticks names on the attendance list, or scans the printed card each child carries. A parent can also check in the whole family with one scan.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="star"></i></span><h3>A star chart for kids</h3><p>A simple view a child can own: one star for each dawn in the last 40 days, a big streak number and their own card to show at the door.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="users-round"></i></span><h3>Squads</h3><p>Up to 10 friends at one mosque who hold each other to Fajr, ranked by days per member. A join code is all it takes.</p></article>
+          <article class="card wide reveal"><span class="ico"><i data-lucide="globe"></i></span><h3>Mosques, cities and countries</h3><p>The world leaderboard ranks approved mosques by total check-ins and by consistency, so a small mosque can beat a big one. The same numbers add up into city and country tables, and worldwide seasons such as a winter 40 days.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="shield-check"></i></span><h3>Excused, not broken</h3><p>Ill or travelling where there is no registered mosque? Your mosque can excuse the day, and your streak carries on.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="calendar-range"></i></span><h3>Your year in review</h3><p>Your dawns month by month, your best streak and the mosques you prayed in, as a page and as an image to share.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="sunrise"></i></span><h3>First in today</h3><p>Each morning the first three through the door are named on the mosque's page.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="award"></i></span><h3>Ten badges</h3><p>From First Dawn to Rijal al-Fajr, earned at 40 dawns in a row, plus Musafir for praying Fajr at three different mosques.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="image"></i></span><h3>A card for your story</h3><p>One tap draws your streak as an image sized for an Instagram story, ready to share.</p></article>
         </div>
       </section>
 
+      <!-- ============ languages ============ -->
+      <section class="langs dark">
+        <div class="wrap langs-in">
+          <span class="ico big"><i data-lucide="languages"></i></span>
+          <h2>In fifteen languages</h2>
+          <p class="sub">English, Arabic, Urdu, Persian, Turkish, Indonesian, Malay, Bengali, Hindi, French, Spanish, Portuguese, Russian, Chinese and Swahili, with right-to-left layout where the language needs it.</p>
+        </div>
+        <div class="marquee" data-notranslate aria-hidden="true"><div id="marquee-a" class="track"></div></div>
+        <div class="marquee reverse" data-notranslate aria-hidden="true"><div id="marquee-b" class="track"></div></div>
+      </section>
+
+      <!-- ============ for mosques ============ -->
       <section id="mosques" class="dark mosques">
         <div class="wrap">
           <p class="eyebrow">For mosques and organisations</p>
           <h2>Run a Fajr challenge without the paper register.</h2>
           <p class="sub">Register your mosque in a few minutes. It works straight away, and joins the world leaderboard once approved.</p>
-          <figure class="tablet"><img src="/shots/screen.webp" alt="The mosque screen: a large QR code beside the number of people at Fajr today" width="1180" height="760" /></figure>
-          <div class="cards on-dark">
-            <article><h3>The mosque screen</h3><p>A tablet or TV at the entrance shows the code, today's count against your goal and the latest names as they come in.</p></article>
-            <article><h3>Or a printed poster</h3><p>No screen? Print the poster. Its code only works while the phone is at the mosque, checked once by location.</p></article>
-            <article><h3>Attendance list</h3><p>Type a name to find it and tick it. A new name is added and marked in one tap, and the last two days can be corrected.</p></article>
-            <article><h3>Works with no signal</h3><p>Prayer halls often have poor reception. Ticks are kept on the phone and sent by themselves when the signal comes back.</p></article>
-            <article><h3>Member cards</h3><p>Print a card with a personal QR code for each child. Scan them one after another at the door.</p></article>
-            <article><h3>Classes</h3><p>A madrasa teacher gets a leaderboard and an attendance list for just their class.</p></article>
-            <article><h3>Challenges and prizes</h3><p>Pick the dates, choose whether Fajr at other mosques counts, and set the prizes. When it ends the winners are announced and certificates are ready to print.</p></article>
-            <article><h3>A target for the whole mosque</h3><p>“If we reach 1,000 check-ins this month, the bakery funds breakfast.” Everyone sees the bar fill.</p></article>
-            <article><h3>After Fajr</h3><p>Post breakfast, a halaqah or football. People tap to say they are staying, so you know how many to expect.</p></article>
-            <article><h3>A public page and a weekly poster</h3><p>Share a link anyone can open, put the live podium on your website, and post the week's podium as an image.</p></article>
-            <article><h3>Your own timetable</h3><p>Use calculated times, or enter the Fajr and iqamah times from your mosque's timetable.</p></article>
-            <article><h3>Numbers you can use</h3><p>Today's count, a 14-day chart, visitors, and a spreadsheet export of every check-in for the last 90 days.</p></article>
-            <article><h3>Admins and volunteers</h3><p>Volunteers run the screen and the list. Admins also change settings, challenges and prizes.</p></article>
-            <article><h3>Organisations</h3><p>A council, a school network or a city groups its mosques under one leaderboard, with its own challenges and prizes.</p></article>
-            <article><h3>Sponsor offers</h3><p>See who has offered to sponsor your mosque, or any mosque in your country, with their contact details and what they offer.</p></article>
-            <article><h3>Practice mode</h3><p>Try the whole thing at any hour before you launch. The mosque stays off the world leaderboard while it is on.</p></article>
+          <figure class="tablet reveal"><img src="/shots/screen.webp" alt="The mosque screen: a large QR code beside the number of people at Fajr today" width="1180" height="760" /></figure>
+          <div class="bento on-dark">
+            <article class="card reveal"><span class="ico"><i data-lucide="printer"></i></span><h3>Or a printed poster</h3><p>No screen? Print the poster. Its code only works while the phone is at the mosque, checked once by location.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="clipboard-list"></i></span><h3>Attendance list</h3><p>Type a name to find it and tick it. A new name is added and marked in one tap, and the last two days can be corrected.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="wifi-off"></i></span><h3>Works with no signal</h3><p>Prayer halls often have poor reception. Ticks are kept on the phone and sent by themselves when the signal comes back.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="id-card"></i></span><h3>Member cards</h3><p>Print a card with a personal QR code for each child. Scan them one after another at the door.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="graduation-cap"></i></span><h3>Classes</h3><p>A madrasa teacher gets a leaderboard and an attendance list for just their class.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="medal"></i></span><h3>Challenges and prizes</h3><p>Pick the dates, choose whether Fajr at other mosques counts, and set the prizes. When it ends the winners are announced and certificates are ready to print.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="target"></i></span><h3>A target for the whole mosque</h3><p>“If we reach 1,000 check-ins this month, the bakery funds breakfast.” Everyone sees the bar fill.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="coffee"></i></span><h3>After Fajr</h3><p>Post breakfast, a halaqah or football. People tap to say they are staying, so you know how many to expect.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="share-2"></i></span><h3>A public page and a weekly poster</h3><p>Share a link anyone can open, put the live podium on your website, and post the week's podium as an image.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="clock"></i></span><h3>Your own timetable</h3><p>Use calculated times, or enter the Fajr and iqamah times from your mosque's timetable.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="chart-column"></i></span><h3>Numbers you can use</h3><p>Today's count, a 14-day chart, visitors, and a spreadsheet export of every check-in for the last 90 days.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="users"></i></span><h3>Admins and volunteers</h3><p>Volunteers run the screen and the list. Admins also change settings, challenges and prizes.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="network"></i></span><h3>Organisations</h3><p>A council, a school network or a city groups its mosques under one leaderboard, with its own challenges and prizes.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="hand-heart"></i></span><h3>Sponsor offers</h3><p>See who has offered to sponsor your mosque, or any mosque in your country, with their contact details and what they offer.</p></article>
+            <article class="card reveal"><span class="ico"><i data-lucide="flask-conical"></i></span><h3>Practice mode</h3><p>Try the whole thing at any hour before you launch. The mosque stays off the world leaderboard while it is on.</p></article>
           </div>
           <div class="pair">
-            <div class="phone solo small"><img src="/shots/manage.webp" alt="The mosque admin screen with today's attendance" width="585" height="1200" /></div>
-            <div class="phone solo small"><img src="/shots/list.webp" alt="The attendance list with names ticked" width="585" height="1200" /></div>
+            <div class="phone solo small reveal"><img src="/shots/manage.webp" alt="The mosque admin screen with today's attendance" width="585" height="1200" /></div>
+            <div class="phone solo small reveal" style="--i:1"><img src="/shots/list.webp" alt="The attendance list with names ticked" width="585" height="1200" /></div>
           </div>
         </div>
       </section>
 
+      <!-- ============ sponsors ============ -->
       <section id="sponsors" class="wrap block">
         <p class="eyebrow">For sponsors</p>
         <h2>Put a bicycle on the podium. Or breakfast on the table.</h2>
         <div class="sponsor">
-          <div class="sponsor-copy">
+          <div class="sponsor-copy reveal">
             <p>A shop, a family or anyone who wants a share in the reward can offer to sponsor. Leave your details, say how you would like to help, and choose who may contact you.</p>
             <ul>
               <li><b>Choose how.</b> Prizes, breakfast after Fajr, money toward prizes, vouchers or products, or something else.</li>
@@ -173,33 +253,39 @@
             </ul>
             <a class="btn dark big" href="/sponsor">Offer to sponsor <span aria-hidden="true">→</span></a>
           </div>
-          <div class="phone solo"><img src="/shots/sponsor.webp" alt="The sponsor form: choose who can contact you and how you would like to sponsor" width="585" height="1200" /></div>
+          <div class="tour-phone reveal" style="--i:1">
+            <div class="halo warm"></div>
+            <div class="phone solo"><img src="/shots/sponsor.webp" alt="The sponsor form: choose who can contact you and how you would like to sponsor" width="585" height="1200" /></div>
+          </div>
         </div>
       </section>
 
+      <!-- ============ fair play and privacy ============ -->
       <section class="wrap block">
         <p class="eyebrow">Fair play and privacy</p>
         <h2>Honest numbers, and very little data.</h2>
-        <div class="cards two">
-          <article><h3>Only at the mosque, only at Fajr</h3><p>The screen code expires in under two minutes. The poster needs the phone to be at the mosque. Check-in is closed outside the Fajr window. One check-in per person per day.</p></article>
-          <article><h3>Admins can put things right</h3><p>Staff can remove a wrong check-in, and they are told when several accounts check in from one phone on the same morning.</p></article>
-          <article><h3>Made for children's privacy</h3><p>A child has no account, no email and no password. Only a display name and a group are stored, added by a parent or the mosque.</p></article>
-          <article><h3>Yours to hide and yours to delete</h3><p>Hide your name on the leaderboard with one switch. Delete your account in the app and every check-in of yours goes with it, straight away.</p></article>
+        <div class="bento two">
+          <article class="card reveal"><span class="ico"><i data-lucide="map-pin"></i></span><h3>Only at the mosque, only at Fajr</h3><p>The screen code expires in under two minutes. The poster needs the phone to be at the mosque. Check-in is closed outside the Fajr window. One check-in per person per day.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="badge-check"></i></span><h3>Admins can put things right</h3><p>Staff can remove a wrong check-in, and they are told when several accounts check in from one phone on the same morning.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="baby"></i></span><h3>Made for children's privacy</h3><p>A child has no account, no email and no password. Only a display name and a group are stored, added by a parent or the mosque.</p></article>
+          <article class="card reveal"><span class="ico"><i data-lucide="eye-off"></i></span><h3>Yours to hide and yours to delete</h3><p>Hide your name on the leaderboard with one switch. Delete your account in the app and every check-in of yours goes with it, straight away.</p></article>
         </div>
-        <p class="intent">The leaderboard is encouragement, not the goal. The reward for Fajr is with Allah.</p>
+        <blockquote class="intent reveal"><span class="ico big"><i data-lucide="sparkles"></i></span><p>The leaderboard is encouragement, not the goal. The reward for Fajr is with Allah.</p></blockquote>
       </section>
 
+      <!-- ============ what comes next ============ -->
       <section class="wrap block">
         <p class="eyebrow">What comes next</p>
         <h2>On the way.</h2>
         <ul class="next">
-          <li><b>iPhone and Android apps.</b> Coming soon to the App Store and Google Play. Until then, add the web app to your home screen.</li>
-          <li><b>Fajr reminders.</b> A notification before the adhan, and buddy nudges that reach your lock screen.</li>
-          <li><b>Sign in with Google or Apple,</b> and password reset by email.</li>
-          <li><b>A map of mosques.</b></li>
+          <li class="reveal"><b>iPhone and Android apps.</b> Coming soon to the App Store and Google Play. Until then, add the web app to your home screen.</li>
+          <li class="reveal"><b>Fajr reminders.</b> A notification before the adhan, and buddy nudges that reach your lock screen.</li>
+          <li class="reveal"><b>Sign in with Google or Apple,</b> and password reset by email.</li>
+          <li class="reveal"><b>A map of mosques.</b></li>
         </ul>
       </section>
 
+      <!-- ============ questions ============ -->
       <section id="questions" class="wrap block faq">
         <p class="eyebrow">Questions</p>
         <h2>Asked before the first Fajr.</h2>
@@ -217,8 +303,10 @@
         <details><summary>How does my mosque get on the world leaderboard?</summary><p>Register it in the app. It works at once for your own congregation, and appears on the world leaderboard after it has been approved, which keeps fake mosques out.</p></details>
       </section>
 
+      <!-- ============ closing: sunrise ============ -->
       <section class="dark closing">
-        <div class="wrap">
+        <div class="sky" aria-hidden="true"><div class="stars"></div><div class="sun"></div><div class="haze"></div></div>
+        <div class="wrap closing-in">
           <h2>Tomorrow's Fajr is a good day to start.</h2>
           <p class="sub">Open the app, find your mosque or register it, and be there at dawn.</p>
           <div class="cta-row center">
@@ -226,6 +314,32 @@
           </div>
           <p class="fine">Coming soon to the App Store and Google Play.</p>
         </div>
+        <svg class="skyline" viewBox="0 0 1440 220" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+          <g fill="#06130f">
+            <rect x="0" y="196" width="1440" height="24" />
+            <!-- far town -->
+            <path d="M0 196v-34h46v-18h38v24h52v-40h30v40h44v-22h58v22h36v-52h26v52h62v-30h48v30h40v36z" opacity=".55" />
+            <path d="M1440 196v-40h-52v-22h-40v30h-46v-46h-28v46h-58v-26h-44v26h-50v-58h-24v58h-70v-28h-46v28h-34v32z" opacity=".55" />
+            <!-- minarets -->
+            <path d="M498 196V74l-5-6 9-34 9 34-5 6v122z" /><rect x="489" y="104" width="26" height="7" rx="2" /><rect x="491" y="140" width="22" height="6" rx="2" />
+            <path d="M934 196V74l-5-6 9-34 9 34-5 6v122z" /><rect x="925" y="104" width="26" height="7" rx="2" /><rect x="927" y="140" width="22" height="6" rx="2" />
+            <path d="M396 196v-84l-4-5 7-24 7 24-4 5v84z" /><path d="M1038 196v-84l-4-5 7-24 7 24-4 5v84z" />
+            <!-- prayer hall and domes -->
+            <rect x="540" y="136" width="360" height="60" />
+            <path d="M620 136a100 86 0 0 1 200 0z" />
+            <path d="M548 136a44 38 0 0 1 88 0z" /><path d="M804 136a44 38 0 0 1 88 0z" />
+            <rect x="430" y="158" width="110" height="38" /><rect x="900" y="158" width="110" height="38" />
+            <path d="M444 158a34 28 0 0 1 68 0z" /><path d="M928 158a34 28 0 0 1 68 0z" />
+            <rect x="718" y="30" width="4" height="22" />
+          </g>
+          <!-- crescent on the main dome -->
+          <path d="M727 20a9 9 0 1 1-10-8 7 7 0 1 0 10 8z" fill="#f0c066" />
+          <!-- lit doorway and windows -->
+          <g fill="#f0c066" opacity=".85">
+            <path d="M706 196v-30a14 14 0 0 1 28 0v30z" />
+            <path d="M592 196v-22a8 8 0 0 1 16 0v22zM640 196v-22a8 8 0 0 1 16 0v22zM784 196v-22a8 8 0 0 1 16 0v22zM832 196v-22a8 8 0 0 1 16 0v22z" opacity=".7" />
+          </g>
+        </svg>
       </section>
     </main>
 
