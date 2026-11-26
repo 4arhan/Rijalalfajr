@@ -8,7 +8,7 @@ export interface Db {
   close(): Promise<void>;
 }
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 create table if not exists meta (key text primary key, value text not null);
@@ -151,6 +151,82 @@ create table if not exists sponsors (
 );
 create index if not exists sponsors_country on sponsors(lower(country));
 create index if not exists sponsors_mosque on sponsors(mosque_id);
+
+-- Version 3: goals, invitations, buddies, excused days, classes, events,
+-- shared targets, seasons, the mosque's own times.
+alter table users add column if not exists invite_code text unique;
+alter table mosques add column if not exists fajr_time text;
+alter table mosques add column if not exists iqamah_time text;
+alter table mosques add column if not exists public_board boolean not null default true;
+
+create table if not exists classes (
+  id text primary key,
+  mosque_id text not null references mosques(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+alter table strivers add column if not exists weekly_goal int not null default 0;
+alter table strivers add column if not exists invited_by text references strivers(id) on delete set null;
+alter table strivers add column if not exists class_id text references classes(id) on delete set null;
+
+-- A day a mosque admin has excused (illness, travel): it does not break a streak.
+create table if not exists excuses (
+  striver_id text not null references strivers(id) on delete cascade,
+  fajr_date text not null,
+  mosque_id text not null references mosques(id) on delete cascade,
+  by_user_id text references users(id) on delete set null,
+  primary key (striver_id, fajr_date)
+);
+
+-- Stored once in each direction.
+create table if not exists buddies (
+  a text not null references strivers(id) on delete cascade,
+  b text not null references strivers(id) on delete cascade,
+  primary key (a, b)
+);
+create table if not exists nudges (
+  id text primary key,
+  from_striver text not null references strivers(id) on delete cascade,
+  to_striver text not null references strivers(id) on delete cascade,
+  day text not null,
+  seen boolean not null default false,
+  created_at timestamptz not null default now(),
+  unique (from_striver, to_striver, day)
+);
+
+create table if not exists events (
+  id text primary key,
+  mosque_id text not null references mosques(id) on delete cascade,
+  fajr_date text not null,
+  title text not null,
+  detail text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists event_going (
+  event_id text not null references events(id) on delete cascade,
+  striver_id text not null references strivers(id) on delete cascade,
+  primary key (event_id, striver_id)
+);
+
+-- "If we reach 1,000 check-ins this month, the bakery funds breakfast."
+create table if not exists pledges (
+  id text primary key,
+  mosque_id text not null references mosques(id) on delete cascade,
+  reward text not null,
+  target int not null,
+  start_date text not null,
+  end_date text not null,
+  sponsor text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists seasons (
+  id text primary key,
+  name text not null,
+  start_date text not null,
+  end_date text not null,
+  created_at timestamptz not null default now()
+);
 
 create table if not exists reports (
   id text primary key,

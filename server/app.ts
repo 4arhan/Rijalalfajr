@@ -4,6 +4,7 @@ import type { Db } from './db.js';
 import {
   CALC_METHODS,
   addDays,
+  daysBetween,
   distanceM,
   fajrWindow,
   isValidTimezone,
@@ -11,7 +12,7 @@ import {
   windowState,
   type MosqueTiming,
 } from './fajr.js';
-import { badges, rerank, standings, streaks, type CheckinRow, type Group, type StriverRow } from './board.js';
+import { badges, rerank, shortName, standings, streaks, type CheckinRow, type Group, type Standing, type StriverRow } from './board.js';
 import {
   QR_STEP_SEC,
   checkCode,
@@ -52,6 +53,9 @@ interface MosqueRow extends MosqueTiming {
   static_key: string;
   org_id: string | null;
   labels: Record<string, string>;
+  fajr_time: string | null;
+  iqamah_time: string | null;
+  public_board: boolean;
 }
 
 type Env = { Variables: { db: Db; user: User | null; now: Date } };
@@ -93,6 +97,9 @@ const mosqueFields = {
   practice: z.boolean(),
   labels: z.object({ kids: z.string().max(30), youth: z.string().max(30), adults: z.string().max(30) }).partial(),
 };
+const clock = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 05:45').nullable();
+// Settings added after launch. They are optional when a mosque is registered.
+const mosqueExtras = { fajrTime: clock, iqamahTime: clock, publicBoard: z.boolean() };
 
 const prizeSchema = z.object({
   grp: z.enum(['all', ...GROUPS]),
@@ -223,6 +230,9 @@ export function createApp(opts: AppOptions) {
       suspended: m.suspended,
       orgId: m.org_id,
       labels: { kids: 'Kids', youth: 'Youth', adults: 'Adults', ...(m.labels ?? {}) },
+      fajrTime: m.fajr_time,
+      iqamahTime: m.iqamah_time,
+      publicBoard: m.public_board,
     };
   }
 
@@ -263,8 +273,9 @@ export function createApp(opts: AppOptions) {
       squad_id: string | null;
       anonymous: boolean;
       card_code: string;
+      weekly_goal: number;
     }>(
-      `select id, name, grp, user_id, home_mosque_id, squad_id, anonymous, card_code from strivers
+      `select id, name, grp, user_id, home_mosque_id, squad_id, anonymous, card_code, weekly_goal from strivers
        where user_id = $1 or guardian_user_id = $1 order by (user_id is null), created_at`,
       [userId],
     );
@@ -283,7 +294,27 @@ export function createApp(opts: AppOptions) {
          and ($4::boolean = false or c.mosque_id = any($1))`,
       [mosqueIds, from, to, hostOnly],
     );
-    return standings(strivers, checkins, today);
+    const ex = await db.query<{ striver_id: string; fajr_date: string }>(
+      `select e.striver_id, e.fajr_date from excuses e join strivers s on s.id = e.striver_id
+       where s.home_mosque_id = any($1) and e.fajr_date between $2 and $3`,
+      [mosqueIds, from, to],
+    );
+    return standings(strivers, checkins, today, excusedMap(ex));
+  }
+
+  function excusedMap(rows: { striver_id: string; fajr_date: string }[]) {
+    const map = new Map<string, Set<string>>();
+    for (const r of rows) {
+      const set = map.get(r.striver_id);
+      if (set) set.add(r.fajr_date);
+      else map.set(r.striver_id, new Set([r.fajr_date]));
+    }
+    return map;
+  }
+
+  /** What a visitor without an account sees: first name and an initial. */
+  function forViewer(c: C, rows: Standing[]): Standing[] {
+    return c.get('user') ? rows : rows.map((r) => ({ ...r, name: shortName(r.name) }));
   }
 
   function periodRange(period: string | undefined, today: string) {
@@ -318,9 +349,11 @@ export function createApp(opts: AppOptions) {
 
   async function streakOf(db: Db, striverId: string, today: string) {
     const rows = await db.query<{ fajr_date: string }>(`select fajr_date from checkins where striver_id = $1`, [striverId]);
+    const ex = await db.query<{ fajr_date: string }>(`select fajr_date from excuses where striver_id = $1`, [striverId]);
     return streaks(
       rows.map((r) => r.fajr_date),
       today,
+      new Set(ex.map((r) => r.fajr_date)),
     );
   }
 
@@ -329,25 +362,40 @@ export function createApp(opts: AppOptions) {
   app.post('/auth/signup', async (c) => {
     const v = await body(
       c,
-      z.object({ email: z.string().trim().toLowerCase().email().max(200), password: z.string().min(8).max(200), name, grp: grp.default('adults') }),
+      z.object({
+        email: z.string().trim().toLowerCase().email().max(200), password: z.string().min(8).max(200), name, grp: grp.default('adults'),
+        inviteCode: z.string().trim().max(20).optional(),
+      }),
     );
     const db = c.get('db');
     const [taken] = await db.query(`select 1 from users where email = $1`, [v.email]);
     if (taken) throw new HttpError(409, 'email_taken', 'An account with this email already exists. Sign in instead.');
     const id = newId();
-    await db.query(`insert into users (id, email, pass_hash, name) values ($1,$2,$3,$4)`, [
+    await db.query(`insert into users (id, email, pass_hash, name, invite_code) values ($1,$2,$3,$4,$5)`, [
       id,
       v.email,
       await hashPassword(v.password),
       v.name,
+      newCode(8),
     ]);
-    await db.query(`insert into strivers (id, name, grp, user_id, card_code) values ($1,$2,$3,$4,$5)`, [
-      newId(),
+    // Invited by a friend: start at their mosque, as their buddy.
+    const [inviter] = v.inviteCode
+      ? await db.query<{ id: string; home_mosque_id: string | null }>(
+          `select s.id, s.home_mosque_id from strivers s join users u on u.id = s.user_id where u.invite_code = $1`,
+          [v.inviteCode.toUpperCase()],
+        )
+      : [];
+    const sid = newId();
+    await db.query(`insert into strivers (id, name, grp, user_id, card_code, invited_by, home_mosque_id) values ($1,$2,$3,$4,$5,$6,$7)`, [
+      sid,
       v.name,
       v.grp,
       id,
       newId(14),
+      inviter?.id ?? null,
+      inviter?.home_mosque_id ?? null,
     ]);
+    if (inviter) await db.query(`insert into buddies (a, b) values ($1,$2), ($2,$1) on conflict do nothing`, [sid, inviter.id]);
     return c.json({ token: await createSession(db, id) });
   });
 
@@ -376,8 +424,11 @@ export function createApp(opts: AppOptions) {
       [u.id],
     );
     const orgs = await db.query<{ id: string; name: string }>(`select id, name from orgs where owner_user_id = $1 order by name`, [u.id]);
+    // Accounts made before invitations existed get their code on first use.
+    await db.query(`update users set invite_code = $2 where id = $1 and invite_code is null`, [u.id, newCode(8)]);
+    const [code] = await db.query<{ invite_code: string }>(`select invite_code from users where id = $1`, [u.id]);
     return c.json({
-      user: { id: u.id, email: u.email, name: u.name, owner: isOwner(u) },
+      user: { id: u.id, email: u.email, name: u.name, owner: isOwner(u), inviteCode: code.invite_code },
       strivers: strivers.map((s) => ({
         id: s.id,
         name: s.name,
@@ -387,6 +438,7 @@ export function createApp(opts: AppOptions) {
         squadId: s.squad_id,
         anonymous: s.anonymous,
         cardCode: s.card_code,
+        weeklyGoal: s.weekly_goal,
       })),
       staff,
       orgs,
@@ -397,9 +449,13 @@ export function createApp(opts: AppOptions) {
     const u = need(c);
     const v = await body(
       c,
-      z.object({ name: name.optional(), grp: grp.optional(), anonymous: z.boolean().optional(), homeMosqueId: z.string().nullable().optional() }),
+      z.object({
+        name: name.optional(), grp: grp.optional(), anonymous: z.boolean().optional(), homeMosqueId: z.string().nullable().optional(),
+        weeklyGoal: z.number().int().min(0).max(7).optional(),
+      }),
     );
     const db = c.get('db');
+    if (v.weeklyGoal !== undefined) await db.query(`update strivers set weekly_goal = $2 where user_id = $1`, [u.id, v.weeklyGoal]);
     if (v.name) {
       await db.query(`update users set name = $2 where id = $1`, [u.id, v.name]);
       await db.query(`update strivers set name = $2 where user_id = $1`, [u.id, v.name]);
@@ -412,7 +468,8 @@ export function createApp(opts: AppOptions) {
       if (v.homeMosqueId) await getMosque(db, v.homeMosqueId);
       // The family moves together, and a squad belongs to one mosque.
       await db.query(
-        `update strivers set squad_id = case when home_mosque_id is distinct from $2 then null else squad_id end, home_mosque_id = $2
+        `update strivers set squad_id = case when home_mosque_id is distinct from $2 then null else squad_id end,
+           class_id = case when home_mosque_id is distinct from $2 then null else class_id end, home_mosque_id = $2
          where user_id = $1 or guardian_user_id = $1`,
         [u.id, v.homeMosqueId],
       );
@@ -549,12 +606,30 @@ export function createApp(opts: AppOptions) {
       [m.id, m.org_id ?? ''],
     );
     const [org] = m.org_id ? await db.query<{ id: string; name: string }>(`select id, name from orgs where id = $1`, [m.org_id]) : [];
+    const viewer = c.get('user');
+    const [self] = viewer ? await db.query<{ id: string }>(`select id from strivers where user_id = $1`, [viewer.id]) : [];
+    const events = await db.query<{ id: string; fajr_date: string; title: string; detail: string; going: number; mine: boolean }>(
+      `select e.id, e.fajr_date, e.title, e.detail,
+         (select count(*)::int from event_going g where g.event_id = e.id) as going,
+         exists (select 1 from event_going g where g.event_id = e.id and g.striver_id = $3) as mine
+       from events e where e.mosque_id = $1 and e.fajr_date >= $2 order by e.fajr_date limit 5`,
+      [m.id, win.today, self?.id ?? ''],
+    );
+    const pledges = await db.query<{ id: string; reward: string; target: number; start_date: string; end_date: string; sponsor: string; progress: number }>(
+      `select p.id, p.reward, p.target, p.start_date, p.end_date, p.sponsor,
+         (select count(*)::int from checkins c where c.mosque_id = p.mosque_id and c.fajr_date between p.start_date and p.end_date) as progress
+       from pledges p where p.mosque_id = $1 and p.end_date >= $2 order by p.end_date limit 5`,
+      [m.id, addDays(win.today, -14)],
+    );
+    const showNames = !!viewer || m.public_board;
     return c.json({
+      events: events.map((e) => ({ id: e.id, date: e.fajr_date, title: e.title, detail: e.detail, going: e.going, mine: e.mine })),
+      pledges: pledges.map((p) => ({ id: p.id, reward: p.reward, target: p.target, startDate: p.start_date, endDate: p.end_date, sponsor: p.sponsor, progress: p.progress })),
       mosque: mosqueJson(m),
       window: win,
       todayCount: count.n,
       members: members.n,
-      earlyBirds: early.map((e) => ({ name: e.anonymous ? 'Anonymous striver' : e.name, at: e.at })),
+      earlyBirds: showNames ? early.map((e) => ({ name: e.anonymous ? 'Anonymous striver' : viewer ? e.name : shortName(e.name), at: e.at })) : [],
       challenges: challenges.map((ch) => ({
         id: ch.id,
         name: ch.name,
@@ -571,9 +646,15 @@ export function createApp(opts: AppOptions) {
   app.patch('/mosques/:id', async (c) => {
     const id = c.req.param('id');
     await needStaff(c, id, true);
-    const v = await body(c, z.object(mosqueFields).partial());
+    const v = await body(c, z.object({ ...mosqueFields, ...mosqueExtras }).partial());
     const db = c.get('db');
     const m = await getMosque(db, id);
+    await db.query(`update mosques set fajr_time = $2, iqamah_time = $3, public_board = $4 where id = $1`, [
+      id,
+      v.fajrTime === undefined ? m.fajr_time : v.fajrTime,
+      v.iqamahTime === undefined ? m.iqamah_time : v.iqamahTime,
+      v.publicBoard ?? m.public_board,
+    ]);
     await db.query(
       `update mosques set name=$2, city=$3, country=$4, lat=$5, lng=$6, timezone=$7, calc_method=$8, open_before_min=$9,
          iqamah_after_min=$10, close_after_sunrise_min=$11, radius_m=$12, daily_goal=$13, practice=$14, labels=$15 where id=$1`,
@@ -592,8 +673,10 @@ export function createApp(opts: AppOptions) {
     const m = await getMosque(db, c.req.param('id'));
     const today = localDate(c.get('now'), m.timezone);
     const range = periodRange(c.req.query('period'), today);
+    // A mosque can keep its names for people who are signed in.
+    if (!c.get('user') && !m.public_board) return c.json({ rows: [], total: 0, today, from: range.from, hidden: true });
     const rows = await homeBoard(db, [m.id], range.from, range.to, false, today);
-    return c.json({ rows: rows.slice(0, 300), total: rows.length, today, from: range.from });
+    return c.json({ rows: forViewer(c, rows.slice(0, 300)), total: rows.length, today, from: range.from, hidden: false });
   });
 
   app.get('/mosques/:id/squads', async (c) => {
@@ -788,13 +871,15 @@ export function createApp(opts: AppOptions) {
     const date = markDate(m, c.get('now'), c.req.query('date'));
     const rows = await db.query<{
       id: string; name: string; grp: Group; managed: boolean; card_code: string; checkin_mosque: string | null; method: string | null; at: Date | null;
+      class_id: string | null; excused: boolean;
     }>(
       `select s.id, s.name, s.grp, (s.managed_mosque_id is not null) as managed, s.card_code,
-              c.mosque_id as checkin_mosque, c.method, c.at
+              c.mosque_id as checkin_mosque, c.method, c.at, s.class_id, (e.striver_id is not null) as excused
        from strivers s left join checkins c on c.striver_id = s.id and c.fajr_date = $2
+         left join excuses e on e.striver_id = s.id and e.fajr_date = $2
        where s.home_mosque_id = $1
        union
-       select s.id, s.name, s.grp, false, s.card_code, c.mosque_id, c.method, c.at
+       select s.id, s.name, s.grp, false, s.card_code, c.mosque_id, c.method, c.at, null, false
        from checkins c join strivers s on s.id = c.striver_id
        where c.mosque_id = $1 and c.fajr_date = $2 and s.home_mosque_id is distinct from $1
        order by 2`,
@@ -805,6 +890,7 @@ export function createApp(opts: AppOptions) {
       people: rows.map((r) => ({
         id: r.id, name: r.name, grp: r.grp, managed: r.managed, cardCode: r.card_code,
         present: r.checkin_mosque !== null, here: r.checkin_mosque === id, method: r.method, at: r.at,
+        classId: r.class_id, excused: r.excused,
       })),
     });
   });
@@ -979,7 +1065,17 @@ export function createApp(opts: AppOptions) {
     );
     const [home] = s.home_mosque_id ? await db.query<MosqueRow>(`select * from mosques where id = $1`, [s.home_mosque_id]) : [];
     const today = localDate(c.get('now'), home?.timezone ?? 'UTC');
-    const st = streaks(rows.map((r) => r.fajr_date), today);
+    const ex = await db.query<{ fajr_date: string }>(`select fajr_date from excuses where striver_id = $1`, [s.id]);
+    const st = streaks(rows.map((r) => r.fajr_date), today, new Set(ex.map((r) => r.fajr_date)));
+    const [extra] = await db.query<{ weekly_goal: number; invited: number }>(
+      `select s.weekly_goal,
+         (select count(*)::int from strivers i where i.invited_by = s.id and exists (select 1 from checkins c where c.striver_id = i.id)) as invited
+       from strivers s where s.id = $1`,
+      [s.id],
+    );
+    // The week runs Monday to Sunday.
+    const [ty, tm, td] = today.split('-').map(Number);
+    const monday = addDays(today, -((new Date(Date.UTC(ty, tm - 1, td)).getUTCDay() + 6) % 7));
     let rank: number | null = null;
     let ranked = 0;
     if (home) {
@@ -995,6 +1091,9 @@ export function createApp(opts: AppOptions) {
       best: st.best,
       doneToday: rows.some((r) => r.fajr_date === today),
       dates: rows.filter((r) => r.fajr_date >= addDays(today, -180)).map((r) => r.fajr_date),
+      excused: ex.filter((r) => r.fajr_date >= addDays(today, -180)).map((r) => r.fajr_date),
+      weeklyGoal: extra.weekly_goal,
+      weekDays: rows.filter((r) => r.fajr_date >= monday).length,
       recent: rows.slice(0, 5).map((r) => ({ date: r.fajr_date, mosque: r.mosque })),
       mosques: new Set(rows.map((r) => r.mosque_id)).size,
       rank,
@@ -1005,7 +1104,43 @@ export function createApp(opts: AppOptions) {
         best: st.best,
         mosques: new Set(rows.map((r) => r.mosque_id)).size,
         early: rows.filter((r) => r.offset_sec <= 0).length,
+        invited: extra.invited,
       }),
+    });
+  });
+
+  app.get('/strivers/:id/review', async (c) => {
+    const u = need(c);
+    const db = c.get('db');
+    const [s] = await db.query<{ id: string; name: string; user_id: string | null; guardian_user_id: string | null }>(
+      `select id, name, user_id, guardian_user_id from strivers where id = $1`,
+      [c.req.param('id')],
+    );
+    if (!s || (s.user_id !== u.id && s.guardian_user_id !== u.id)) throw new HttpError(403, 'forbidden', 'You cannot see this person.');
+    const year = /^\d{4}$/.test(c.req.query('year') ?? '') ? c.req.query('year')! : String(c.get('now').getUTCFullYear());
+    const rows = await db.query<{ fajr_date: string; offset_sec: number; mosque: string }>(
+      `select c.fajr_date, c.offset_sec, m.name as mosque from checkins c join mosques m on m.id = c.mosque_id
+       where c.striver_id = $1 and c.fajr_date between $2 and $3 order by c.fajr_date`,
+      [s.id, `${year}-01-01`, `${year}-12-31`],
+    );
+    const ex = await db.query<{ fajr_date: string }>(`select fajr_date from excuses where striver_id = $1`, [s.id]);
+    const months = Array.from({ length: 12 }, () => 0);
+    const byMosque = new Map<string, number>();
+    for (const r of rows) {
+      months[Number(r.fajr_date.slice(5, 7)) - 1]++;
+      byMosque.set(r.mosque, (byMosque.get(r.mosque) ?? 0) + 1);
+    }
+    const top = [...byMosque.entries()].sort((a, b) => b[1] - a[1])[0];
+    return c.json({
+      name: s.name,
+      year: Number(year),
+      total: rows.length,
+      best: streaks(rows.map((r) => r.fajr_date), `${year}-12-31`, new Set(ex.map((r) => r.fajr_date))).best,
+      months,
+      mosques: byMosque.size,
+      topMosque: top ? { name: top[0], days: top[1] } : null,
+      beforeAdhan: rows.filter((r) => r.offset_sec <= 0).length,
+      first: rows[0]?.fajr_date ?? null,
     });
   });
 
@@ -1090,7 +1225,9 @@ export function createApp(opts: AppOptions) {
     }
     const today = localDate(c.get('now'), tz);
     const to = today < ch.end_date ? today : ch.end_date;
-    const rows = to >= ch.start_date ? await homeBoard(db, mosqueIds, ch.start_date, to, !ch.count_away, to) : [];
+    let hidden = false;
+    if (ch.scope_type === 'mosque' && !c.get('user')) hidden = !(await getMosque(db, ch.scope_id)).public_board;
+    const rows = to >= ch.start_date && !hidden ? await homeBoard(db, mosqueIds, ch.start_date, to, !ch.count_away, to) : [];
     const prizes = await db.query<{ id: string; grp: string; place: number | null; milestone_days: number | null; title: string; detail: string; sponsor: string }>(
       `select * from prizes where challenge_id = $1 order by place nulls last, milestone_days`,
       [ch.id],
@@ -1104,7 +1241,8 @@ export function createApp(opts: AppOptions) {
       labels,
       today,
       prizes: prizes.map((p) => ({ grp: p.grp, place: p.place, milestoneDays: p.milestone_days, title: p.title, detail: p.detail, sponsor: p.sponsor })),
-      rows: rows.slice(0, 500),
+      rows: forViewer(c, rows.slice(0, 500)),
+      hidden,
       canEdit: await canManageScope(c, ch.scope_type, ch.scope_id),
     });
   });
@@ -1132,7 +1270,7 @@ export function createApp(opts: AppOptions) {
        where m.org_id = $1 and not m.suspended group by m.id order by total desc, m.name`,
       [o.id, from],
     );
-    const top = rerank(await homeBoard(db, mosques.map((m) => m.id), from, addDays(today, 1), false, today)).slice(0, 20);
+    const top = forViewer(c, rerank(await homeBoard(db, mosques.map((m) => m.id), from, addDays(today, 1), false, today)).slice(0, 20));
     const challenges = await db.query<{ id: string; name: string; start_date: string; end_date: string }>(
       `select id, name, start_date, end_date from challenges where scope_type = 'org' and scope_id = $1 order by end_date desc`,
       [o.id],
@@ -1156,28 +1294,289 @@ export function createApp(opts: AppOptions) {
   app.get('/world', async (c) => {
     const db = c.get('db');
     const today = localDate(c.get('now'), 'UTC');
-    const period = c.req.query('period');
-    const range = periodRange(period, today);
+    const seasons = await db.query<{ id: string; name: string; start_date: string; end_date: string }>(
+      `select id, name, start_date, end_date from seasons where end_date >= $1 order by start_date limit 6`,
+      [addDays(today, -30)],
+    );
+    const season = seasons.find((x) => x.id === c.req.query('season'));
+    const range = season
+      ? { from: season.start_date, to: season.end_date, days: Math.max(1, daysBetween(season.start_date, today < season.end_date ? today : season.end_date) + 1) }
+      : { ...periodRange(c.req.query('period'), today), to: '9999-12-31' };
     const country = (c.req.query('country') ?? '').trim();
     const rows = await db.query<{ id: string; name: string; city: string; country: string; total: number; strivers: number; days: number }>(
       `select m.id, m.name, m.city, m.country, count(c.id)::int as total, count(distinct c.striver_id)::int as strivers,
               count(distinct c.fajr_date)::int as days
-       from mosques m join checkins c on c.mosque_id = m.id and c.fajr_date >= $1
+       from mosques m join checkins c on c.mosque_id = m.id and c.fajr_date between $1 and $3
        where m.verified and not m.practice and not m.suspended and ($2 = '' or m.country = $2)
        group by m.id`,
-      [range.from, country],
+      [range.from, country, range.to],
     );
     const list = rows.map((r) => {
       const span = range.days || Math.max(r.days, 1);
       return { ...r, consistency: r.strivers >= 5 ? Math.min(100, Math.round((r.total / (r.strivers * span)) * 100)) : null };
     });
     if (c.req.query('sort') === 'consistency') {
-      list.sort((a, b) => (b.consistency ?? -1) - (a.consistency ?? -1) || b.total - a.total);
-    } else list.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+      list.sort((x, y) => (y.consistency ?? -1) - (x.consistency ?? -1) || y.total - x.total);
+    } else list.sort((x, y) => y.total - x.total || x.name.localeCompare(y.name));
+    // The same check-ins, added up by city or by country.
+    const group = c.req.query('group');
+    const groups = new Map<string, { name: string; country: string; total: number; mosques: number }>();
+    if (group === 'city' || group === 'country') {
+      for (const r of rows) {
+        const key = group === 'city' ? `${r.city}|${r.country}` : r.country;
+        if (!(group === 'city' ? r.city : r.country)) continue;
+        const g = groups.get(key) ?? { name: group === 'city' ? r.city : r.country, country: r.country, total: 0, mosques: 0 };
+        g.total += r.total;
+        g.mosques += 1;
+        groups.set(key, g);
+      }
+    }
     const countries = await db.query<{ country: string }>(
       `select distinct country from mosques where verified and not practice and not suspended and country <> '' order by country`,
     );
-    return c.json({ rows: list.slice(0, 200), countries: countries.map((r) => r.country) });
+    return c.json({
+      rows: list.slice(0, 200),
+      groups: [...groups.values()].sort((x, y) => y.total - x.total || x.name.localeCompare(y.name)).slice(0, 200),
+      countries: countries.map((r) => r.country),
+      seasons: seasons.map((x) => ({
+        id: x.id, name: x.name, startDate: x.start_date, endDate: x.end_date,
+        status: today < x.start_date ? 'upcoming' : today > x.end_date ? 'ended' : 'active',
+      })),
+    });
+  });
+
+  // ---------- buddies ----------
+
+  app.get('/buddies', async (c) => {
+    const me = await selfStriver(c);
+    const db = c.get('db');
+    const now = c.get('now');
+    const rows = await db.query<{ id: string; name: string; mosque: string | null; timezone: string | null }>(
+      `select s.id, s.name, m.name as mosque, m.timezone from buddies b join strivers s on s.id = b.b
+       left join mosques m on m.id = s.home_mosque_id where b.a = $1 order by s.name`,
+      [me.id],
+    );
+    const ids = rows.map((r) => r.id);
+    const dates = ids.length ? await db.query<{ striver_id: string; fajr_date: string }>(`select striver_id, fajr_date from checkins where striver_id = any($1)`, [ids]) : [];
+    const ex = ids.length ? await db.query<{ striver_id: string; fajr_date: string }>(`select striver_id, fajr_date from excuses where striver_id = any($1)`, [ids]) : [];
+    const excused = excusedMap(ex);
+    const day = localDate(now, 'UTC');
+    const sent = await db.query<{ to_striver: string }>(`select to_striver from nudges where from_striver = $1 and day = $2`, [me.id, day]);
+    const nudges = await db.query<{ id: string; name: string }>(
+      `select n.id, s.name from nudges n join strivers s on s.id = n.from_striver where n.to_striver = $1 and not n.seen order by n.created_at desc limit 10`,
+      [me.id],
+    );
+    return c.json({
+      buddies: rows.map((r) => {
+        const mine = dates.filter((d) => d.striver_id === r.id).map((d) => d.fajr_date);
+        const today = localDate(now, r.timezone ?? 'UTC');
+        return {
+          striverId: r.id, name: r.name, mosque: r.mosque, doneToday: mine.includes(today),
+          streak: streaks(mine, today, excused.get(r.id)).current, nudged: sent.some((x) => x.to_striver === r.id),
+        };
+      }),
+      nudges,
+    });
+  });
+
+  app.post('/buddies', async (c) => {
+    const v = await body(c, z.object({ code: z.string().trim().toUpperCase().min(4).max(20) }));
+    const me = await selfStriver(c);
+    const db = c.get('db');
+    const [other] = await db.query<{ id: string; name: string }>(
+      `select s.id, s.name from strivers s join users u on u.id = s.user_id where u.invite_code = $1`,
+      [v.code],
+    );
+    if (!other) throw new HttpError(404, 'not_found', 'No one has that code. Check it with your friend.');
+    if (other.id === me.id) throw new HttpError(400, 'self', 'That is your own code. Share it with a friend.');
+    const [n] = await db.query<{ n: number }>(`select count(*)::int as n from buddies where a = $1`, [me.id]);
+    if (n.n >= 10) throw new HttpError(400, 'limit', 'You can have up to 10 buddies.');
+    await db.query(`insert into buddies (a, b) values ($1,$2), ($2,$1) on conflict do nothing`, [me.id, other.id]);
+    return c.json({ name: other.name });
+  });
+
+  app.delete('/buddies/:sid', async (c) => {
+    const me = await selfStriver(c);
+    await c.get('db').query(`delete from buddies where (a = $1 and b = $2) or (a = $2 and b = $1)`, [me.id, c.req.param('sid')]);
+    return c.json({ ok: true });
+  });
+
+  app.post('/buddies/:sid/nudge', async (c) => {
+    const me = await selfStriver(c);
+    const db = c.get('db');
+    const [pair] = await db.query(`select 1 from buddies where a = $1 and b = $2`, [me.id, c.req.param('sid')]);
+    if (!pair) throw new HttpError(403, 'forbidden', 'You can only nudge your buddies.');
+    // One nudge per buddy per day.
+    const rows = await db.query(
+      `insert into nudges (id, from_striver, to_striver, day) values ($1,$2,$3,$4) on conflict (from_striver, to_striver, day) do nothing returning id`,
+      [newId(), me.id, c.req.param('sid'), localDate(c.get('now'), 'UTC')],
+    );
+    return c.json({ sent: rows.length > 0 });
+  });
+
+  app.post('/nudges/seen', async (c) => {
+    const me = await selfStriver(c);
+    await c.get('db').query(`update nudges set seen = true where to_striver = $1`, [me.id]);
+    return c.json({ ok: true });
+  });
+
+  // ---------- excused days ----------
+
+  app.post('/mosques/:id/excuse', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id);
+    const v = await body(c, z.object({ striverId: z.string(), date: dateStr, excused: z.boolean() }));
+    const db = c.get('db');
+    const m = await getMosque(db, id);
+    const today = localDate(c.get('now'), m.timezone);
+    if (v.date < addDays(today, -7) || v.date > addDays(today, 14)) {
+      throw new HttpError(400, 'bad_date', 'A day can be excused from a week back to two weeks ahead.');
+    }
+    const [s] = await db.query<{ id: string }>(`select id from strivers where id = $1 and home_mosque_id = $2`, [v.striverId, id]);
+    if (!s) throw new HttpError(404, 'not_found', 'Only a member of this mosque can be excused here.');
+    if (v.excused) {
+      await db.query(`insert into excuses (striver_id, fajr_date, mosque_id, by_user_id) values ($1,$2,$3,$4) on conflict do nothing`, [
+        s.id, v.date, id, c.get('user')!.id,
+      ]);
+    } else await db.query(`delete from excuses where striver_id = $1 and fajr_date = $2`, [s.id, v.date]);
+    return c.json({ ok: true });
+  });
+
+  // ---------- classes ----------
+
+  app.get('/mosques/:id/classes', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id);
+    const rows = await c.get('db').query<{ id: string; name: string; members: number }>(
+      `select k.id, k.name, (select count(*)::int from strivers s where s.class_id = k.id) as members from classes k where k.mosque_id = $1 order by k.name`,
+      [id],
+    );
+    return c.json({ classes: rows });
+  });
+
+  app.post('/mosques/:id/classes', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id);
+    const v = await body(c, z.object({ name: z.string().trim().min(2).max(40) }));
+    const cid = newId(10);
+    await c.get('db').query(`insert into classes (id, mosque_id, name) values ($1,$2,$3)`, [cid, id, v.name]);
+    return c.json({ id: cid });
+  });
+
+  async function getClass(db: Db, id: string) {
+    const [k] = await db.query<{ id: string; name: string; mosque_id: string }>(`select * from classes where id = $1`, [id]);
+    if (!k) throw new HttpError(404, 'not_found', 'That class was not found.');
+    return k;
+  }
+
+  app.delete('/classes/:id', async (c) => {
+    const db = c.get('db');
+    const k = await getClass(db, c.req.param('id'));
+    await needStaff(c, k.mosque_id, true);
+    await db.query(`delete from classes where id = $1`, [k.id]);
+    return c.json({ ok: true });
+  });
+
+  app.post('/classes/:id/members', async (c) => {
+    const db = c.get('db');
+    const k = await getClass(db, c.req.param('id'));
+    await needStaff(c, k.mosque_id);
+    const v = await body(c, z.object({ striverId: z.string(), member: z.boolean() }));
+    const rows = await db.query(
+      `update strivers set class_id = $3 where id = $1 and home_mosque_id = $2 and ($3::text is not null or class_id = $4) returning id`,
+      [v.striverId, k.mosque_id, v.member ? k.id : null, k.id],
+    );
+    if (!rows.length && v.member) throw new HttpError(404, 'not_found', 'Only a member of this mosque can join the class.');
+    return c.json({ ok: true });
+  });
+
+  app.get('/classes/:id', async (c) => {
+    const db = c.get('db');
+    const k = await getClass(db, c.req.param('id'));
+    const m = await getMosque(db, k.mosque_id);
+    const today = localDate(c.get('now'), m.timezone);
+    const range = periodRange(c.req.query('period'), today);
+    const role = await roleAt(c, m.id);
+    if (!c.get('user') && !m.public_board) return c.json({ class: { id: k.id, name: k.name, mosqueId: m.id, mosqueName: m.name }, rows: [], members: [], role, hidden: true });
+    const members = await db.query<StriverRow>(`select id, name, grp, anonymous, squad_id from strivers where class_id = $1 order by name`, [k.id]);
+    const ids = members.map((x) => x.id);
+    const checkins = ids.length
+      ? await db.query<CheckinRow>(`select striver_id, fajr_date, offset_sec from checkins where striver_id = any($1) and fajr_date between $2 and $3`, [ids, range.from, range.to])
+      : [];
+    const ex = ids.length ? await db.query<{ striver_id: string; fajr_date: string }>(`select striver_id, fajr_date from excuses where striver_id = any($1)`, [ids]) : [];
+    return c.json({
+      class: { id: k.id, name: k.name, mosqueId: m.id, mosqueName: m.name },
+      rows: forViewer(c, standings(members, checkins, today, excusedMap(ex))),
+      // Staff see everyone in the class, including those yet to check in.
+      members: role ? members.map((x) => ({ id: x.id, name: x.name })) : [],
+      role,
+      hidden: false,
+    });
+  });
+
+  // ---------- after Fajr ----------
+
+  app.post('/mosques/:id/events', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id);
+    const v = await body(c, z.object({ title: z.string().trim().min(2).max(80), detail: z.string().trim().max(300).default(''), date: dateStr }));
+    const db = c.get('db');
+    const m = await getMosque(db, id);
+    const today = localDate(c.get('now'), m.timezone);
+    if (v.date < today || v.date > addDays(today, 60)) throw new HttpError(400, 'bad_date', 'Choose a day from today up to two months ahead.');
+    const eid = newId();
+    await db.query(`insert into events (id, mosque_id, fajr_date, title, detail) values ($1,$2,$3,$4,$5)`, [eid, id, v.date, v.title, v.detail]);
+    return c.json({ id: eid });
+  });
+
+  app.delete('/events/:id', async (c) => {
+    const db = c.get('db');
+    const [e] = await db.query<{ mosque_id: string }>(`select mosque_id from events where id = $1`, [c.req.param('id')]);
+    if (!e) return c.json({ ok: true });
+    await needStaff(c, e.mosque_id);
+    await db.query(`delete from events where id = $1`, [c.req.param('id')]);
+    return c.json({ ok: true });
+  });
+
+  app.post('/events/:id/going', async (c) => {
+    const v = await body(c, z.object({ going: z.boolean() }));
+    const me = await selfStriver(c);
+    const db = c.get('db');
+    const [e] = await db.query(`select 1 from events where id = $1`, [c.req.param('id')]);
+    if (!e) throw new HttpError(404, 'not_found', 'That event was not found.');
+    if (v.going) await db.query(`insert into event_going (event_id, striver_id) values ($1,$2) on conflict do nothing`, [c.req.param('id'), me.id]);
+    else await db.query(`delete from event_going where event_id = $1 and striver_id = $2`, [c.req.param('id'), me.id]);
+    return c.json({ ok: true });
+  });
+
+  // ---------- shared targets ----------
+
+  app.post('/mosques/:id/pledges', async (c) => {
+    const id = c.req.param('id');
+    await needStaff(c, id, true);
+    const v = await body(
+      c,
+      z
+        .object({
+          reward: z.string().trim().min(2).max(120), target: z.number().int().min(1).max(10000000), startDate: dateStr, endDate: dateStr,
+          sponsor: z.string().trim().max(80).default(''),
+        })
+        .refine((x) => x.endDate >= x.startDate, 'The end date is before the start date'),
+    );
+    const pid = newId();
+    await c.get('db').query(`insert into pledges (id, mosque_id, reward, target, start_date, end_date, sponsor) values ($1,$2,$3,$4,$5,$6,$7)`, [
+      pid, id, v.reward, v.target, v.startDate, v.endDate, v.sponsor,
+    ]);
+    return c.json({ id: pid });
+  });
+
+  app.delete('/pledges/:id', async (c) => {
+    const db = c.get('db');
+    const [p] = await db.query<{ mosque_id: string }>(`select mosque_id from pledges where id = $1`, [c.req.param('id')]);
+    if (!p) return c.json({ ok: true });
+    await needStaff(c, p.mosque_id, true);
+    await db.query(`delete from pledges where id = $1`, [c.req.param('id')]);
+    return c.json({ ok: true });
   });
 
   // ---------- sponsors ----------
@@ -1308,7 +1707,26 @@ export function createApp(opts: AppOptions) {
               (select count(*)::int from mosques) as mosques, (select count(*)::int from checkins) as checkins`,
     );
     const sponsors = await db.query<SponsorRow>(`${SPONSOR_SELECT} order by s.created_at desc limit 200`);
-    return c.json({ mosques, reports, totals, sponsors: sponsors.map(sponsorJson) });
+    const seasons = await db.query(`select id, name, start_date as "startDate", end_date as "endDate" from seasons order by start_date desc limit 50`);
+    return c.json({ mosques, reports, totals, sponsors: sponsors.map(sponsorJson), seasons });
+  });
+
+  // A season is a worldwide table for a set of dates, such as a winter 40 days.
+  app.post('/owner/seasons', async (c) => {
+    needOwner(c);
+    const v = await body(
+      c,
+      z.object({ name: z.string().trim().min(2).max(60), startDate: dateStr, endDate: dateStr }).refine((x) => x.endDate >= x.startDate, 'The end date is before the start date'),
+    );
+    const id = newId(10);
+    await c.get('db').query(`insert into seasons (id, name, start_date, end_date) values ($1,$2,$3,$4)`, [id, v.name, v.startDate, v.endDate]);
+    return c.json({ id });
+  });
+
+  app.delete('/owner/seasons/:id', async (c) => {
+    needOwner(c);
+    await c.get('db').query(`delete from seasons where id = $1`, [c.req.param('id')]);
+    return c.json({ ok: true });
   });
 
   app.post('/owner/mosques/:id', async (c) => {

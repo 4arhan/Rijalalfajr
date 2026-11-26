@@ -25,6 +25,9 @@ export interface MosqueTiming {
   open_before_min: number;
   iqamah_after_min: number;
   close_after_sunrise_min: number;
+  /** The mosque's own timetable, as HH:MM local time. Null means calculated. */
+  fajr_time?: string | null;
+  iqamah_time?: string | null;
 }
 
 export interface FajrWindow {
@@ -69,6 +72,23 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((b - a) / 86400000);
 }
 
+/** The instant of a wall-clock time (HH:MM) on a date in a timezone. */
+export function zonedInstant(date: string, hhmm: string, timezone: string): Date {
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = hhmm.split(':').map(Number);
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const offset = (t: number) => {
+    const parts = fmt.formatToParts(new Date(t));
+    const g = (k: string) => Number(parts.find((p) => p.type === k)!.value);
+    return Date.UTC(g('year'), g('month') - 1, g('day'), g('hour'), g('minute'), g('second')) - t;
+  };
+  // Two passes, so a time just after a clock change still lands right.
+  return new Date(guess - offset(guess - offset(guess)));
+}
+
 export function fajrWindow(m: MosqueTiming, date: string): FajrWindow {
   const [y, mo, d] = date.split('-').map(Number);
   const make = (CalculationMethod as unknown as Record<string, () => ReturnType<typeof CalculationMethod.MuslimWorldLeague>>)[
@@ -78,13 +98,13 @@ export function fajrWindow(m: MosqueTiming, date: string): FajrWindow {
   // adhan reads the year, month and day from the Date in the runtime's own
   // timezone, so build it from local components to get the date we mean.
   const times = new PrayerTimes(new Coordinates(m.lat, m.lng), new Date(y, mo - 1, d, 12), params);
-  const fajr = times.fajr;
   const sunrise = times.sunrise;
+  const fajr = m.fajr_time ? zonedInstant(date, m.fajr_time, m.timezone) : times.fajr;
   return {
     date,
     fajr,
     sunrise,
-    iqamah: new Date(fajr.getTime() + m.iqamah_after_min * 60000),
+    iqamah: m.iqamah_time ? zonedInstant(date, m.iqamah_time, m.timezone) : new Date(fajr.getTime() + m.iqamah_after_min * 60000),
     opens: new Date(fajr.getTime() - m.open_before_min * 60000),
     closes: new Date(sunrise.getTime() + m.close_after_sunrise_min * 60000),
   };

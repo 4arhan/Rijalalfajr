@@ -209,7 +209,7 @@ describe('competition', () => {
   let challengeId: string;
 
   it('ranks the mosque and reports stats', async () => {
-    const lb = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`);
+    const lb = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`, { token: admin.token });
     expect(lb.status).toBe(200);
     expect(lb.json.rows[0].name).toBe('Little Ibrahim');
     expect(lb.json.rows[0].days).toBe(2);
@@ -332,3 +332,148 @@ describe('competition', () => {
     expect(after.json.rows.some((r: any) => r.striverId === ali.self)).toBe(false);
   });
 });
+
+describe('more ways to take part', () => {
+  let today: string;
+  let kid: string;
+  let friend: Awaited<ReturnType<typeof signup>>;
+  const stats = async (id: string, token = admin.token) => (await call('GET', `/strivers/${id}/stats`, { token })).json;
+
+  it('uses the mosque\u2019s own Fajr and iqamah times when it sets them', async () => {
+    today = (await call('GET', `/mosques/${mosqueId}`)).json.window.today;
+    await call('PATCH', `/mosques/${mosqueId}`, { token: admin.token, body: { fajrTime: '06:10', iqamahTime: '06:30' } });
+    const w = (await call('GET', `/mosques/${mosqueId}`)).json.window;
+    const local = (iso: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+    expect([local(w.fajr), local(w.iqamah), local(w.opens)]).toEqual(['06:10', '06:30', '05:40']);
+    expect((await call('PATCH', `/mosques/${mosqueId}`, { token: admin.token, body: { fajrTime: '6.10' } })).status).toBe(400);
+    await call('PATCH', `/mosques/${mosqueId}`, { token: admin.token, body: { fajrTime: null, iqamahTime: null } });
+    expect((await call('GET', `/mosques/${mosqueId}`)).json.mosque.fajrTime).toBeNull();
+  });
+
+  it('keeps a streak through a day the mosque excused', async () => {
+    kid = (await call('POST', `/mosques/${mosqueId}/roster`, { token: admin.token, body: { name: 'Sami Khan', grp: 'kids' } })).json.id;
+    await call('POST', `/mosques/${mosqueId}/mark`, { token: admin.token, body: { striverId: kid, date: addDays(today, -2) } });
+    await call('POST', `/mosques/${mosqueId}/mark`, { token: admin.token, body: { striverId: kid, date: today } });
+    expect((await stats(kid)).streak).toBe(1);
+    expect((await call('POST', `/mosques/${mosqueId}/excuse`, { token: admin.token, body: { striverId: kid, date: addDays(today, -1), excused: true } })).status).toBe(200);
+    const st = await stats(kid);
+    expect(st).toMatchObject({ streak: 2, best: 2, total: 2 });
+    expect(st.excused).toEqual([addDays(today, -1)]);
+    const roster = await call('GET', `/mosques/${mosqueId}/roster?date=${addDays(today, -1)}`, { token: admin.token });
+    expect(roster.json.people.find((p: any) => p.id === kid).excused).toBe(true);
+    expect((await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`, { token: admin.token })).json.rows.find((r: any) => r.striverId === kid).bestStreak).toBe(2);
+    await call('POST', `/mosques/${mosqueId}/excuse`, { token: admin.token, body: { striverId: kid, date: addDays(today, -1), excused: false } });
+    expect((await stats(kid)).streak).toBe(1);
+    expect((await call('POST', `/mosques/${mosqueId}/excuse`, { token: admin.token, body: { striverId: kid, date: addDays(today, -30), excused: true } })).status).toBe(400);
+  });
+
+  it('invites a friend, who starts at the same mosque as a buddy', async () => {
+    const code = (await call('GET', '/me', { token: admin.token })).json.user.inviteCode;
+    expect(code).toMatch(/^[A-Z0-9]{8}$/);
+    const r = await call('POST', '/auth/signup', { body: { email: 'friend@example.com', password: 'password123', name: 'Faris Friend', inviteCode: code.toLowerCase() } });
+    const me = await call('GET', '/me', { token: r.json.token });
+    friend = { token: r.json.token, self: me.json.strivers[0].id, userId: me.json.user.id };
+    const adminMe = (await call('GET', '/me', { token: admin.token })).json;
+    expect(me.json.strivers[0].homeMosqueId).toBe(adminMe.strivers[0].homeMosqueId);
+    const list = await call('GET', '/buddies', { token: friend.token });
+    expect(list.json.buddies.map((b: any) => b.name)).toEqual(['Imam Yusuf']);
+    // The badge counts friends who have actually come to Fajr.
+    expect((await stats(adminMe.strivers[0].id)).badges.find((b: any) => b.id === 'caller').progress).toBe(0);
+    await call('POST', `/mosques/${mosqueId}/mark`, { token: admin.token, body: { striverId: friend.self } });
+    expect((await stats(adminMe.strivers[0].id)).badges.find((b: any) => b.id === 'caller').progress).toBe(1);
+  });
+
+  it('lets buddies see each other and nudge once a day', async () => {
+    const mine = await call('GET', '/buddies', { token: admin.token });
+    expect(mine.json.buddies[0]).toMatchObject({ name: 'Faris Friend', doneToday: true, streak: 1, nudged: false });
+    expect((await call('POST', `/buddies/${friend.self}/nudge`, { token: admin.token })).json.sent).toBe(true);
+    expect((await call('POST', `/buddies/${friend.self}/nudge`, { token: admin.token })).json.sent).toBe(false);
+    expect((await call('POST', `/buddies/${kid}/nudge`, { token: admin.token })).status).toBe(403);
+    expect((await call('GET', '/buddies', { token: friend.token })).json.nudges.map((n: any) => n.name)).toEqual(['Imam Yusuf']);
+    await call('POST', '/nudges/seen', { token: friend.token });
+    expect((await call('GET', '/buddies', { token: friend.token })).json.nudges).toHaveLength(0);
+    const other = await signup('pal@example.com', 'Pal');
+    const palCode = (await call('GET', '/me', { token: other.token })).json.user.inviteCode;
+    expect((await call('POST', '/buddies', { token: other.token, body: { code: palCode } })).json.error.code).toBe('self');
+    expect((await call('POST', '/buddies', { token: friend.token, body: { code: palCode } })).json.name).toBe('Pal');
+    await call('DELETE', `/buddies/${other.self}`, { token: friend.token });
+    expect((await call('GET', '/buddies', { token: other.token })).json.buddies).toHaveLength(0);
+  });
+
+  it('tracks a personal weekly goal and a year in review', async () => {
+    await call('PATCH', '/me', { token: friend.token, body: { weeklyGoal: 5 } });
+    expect(await stats(friend.self, friend.token)).toMatchObject({ weeklyGoal: 5, weekDays: 1 });
+    const review = await call('GET', `/strivers/${friend.self}/review?year=${today.slice(0, 4)}`, { token: friend.token });
+    expect(review.json).toMatchObject({ total: 1, best: 1, mosques: 1, topMosque: { name: 'East London Masjid', days: 1 } });
+    expect(review.json.months[Number(today.slice(5, 7)) - 1]).toBe(1);
+    expect((await call('GET', `/strivers/${friend.self}/review`, { token: admin.token })).status).toBe(403);
+  });
+
+  it('shows the podium without an account, with shortened names, unless the mosque hides it', async () => {
+    const open = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`);
+    expect(open.json.rows.map((r: any) => r.name)).toContain('Sami K.');
+    expect(open.json.rows.map((r: any) => r.name)).not.toContain('Sami Khan');
+    const signedIn = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`, { token: friend.token });
+    expect(signedIn.json.rows.map((r: any) => r.name)).toContain('Sami Khan');
+    await call('PATCH', `/mosques/${mosqueId}`, { token: admin.token, body: { publicBoard: false } });
+    const hidden = await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`);
+    expect(hidden.json).toMatchObject({ hidden: true, rows: [] });
+    expect((await call('GET', `/mosques/${mosqueId}`)).json.earlyBirds).toEqual([]);
+    expect((await call('GET', `/mosques/${mosqueId}/leaderboard?period=week`, { token: friend.token })).json.rows.length).toBeGreaterThan(0);
+    await call('PATCH', `/mosques/${mosqueId}`, { token: admin.token, body: { publicBoard: true } });
+  });
+
+  it('posts what is on after Fajr and counts who is staying', async () => {
+    expect((await call('POST', `/mosques/${mosqueId}/events`, { token: friend.token, body: { title: 'Breakfast', date: today } })).status).toBe(403);
+    expect((await call('POST', `/mosques/${mosqueId}/events`, { token: admin.token, body: { title: 'Breakfast', date: addDays(today, -1) } })).status).toBe(400);
+    const ev = await call('POST', `/mosques/${mosqueId}/events`, { token: admin.token, body: { title: 'Breakfast and football', detail: 'In the hall', date: today } });
+    await call('POST', `/events/${ev.json.id}/going`, { token: friend.token, body: { going: true } });
+    await call('POST', `/events/${ev.json.id}/going`, { token: friend.token, body: { going: true } });
+    expect((await call('GET', `/mosques/${mosqueId}`, { token: friend.token })).json.events[0]).toMatchObject({ title: 'Breakfast and football', going: 1, mine: true });
+    expect((await call('GET', `/mosques/${mosqueId}`)).json.events[0]).toMatchObject({ going: 1, mine: false });
+    await call('POST', `/events/${ev.json.id}/going`, { token: friend.token, body: { going: false } });
+    expect((await call('GET', `/mosques/${mosqueId}`, { token: friend.token })).json.events[0].going).toBe(0);
+    await call('DELETE', `/events/${ev.json.id}`, { token: admin.token });
+    expect((await call('GET', `/mosques/${mosqueId}`)).json.events).toHaveLength(0);
+  });
+
+  it('counts the whole mosque toward a shared target', async () => {
+    const body = { reward: 'Breakfast for everyone', target: 5, startDate: addDays(today, -3), endDate: addDays(today, 3), sponsor: 'Baraka Bakery' };
+    expect((await call('POST', `/mosques/${mosqueId}/pledges`, { token: friend.token, body })).status).toBe(403);
+    const made = await call('POST', `/mosques/${mosqueId}/pledges`, { token: admin.token, body });
+    const p = (await call('GET', `/mosques/${mosqueId}`)).json.pledges[0];
+    expect(p).toMatchObject({ reward: 'Breakfast for everyone', target: 5, sponsor: 'Baraka Bakery' });
+    expect(p.progress).toBeGreaterThanOrEqual(5);
+    await call('DELETE', `/pledges/${made.json.id}`, { token: admin.token });
+    expect((await call('GET', `/mosques/${mosqueId}`)).json.pledges).toHaveLength(0);
+  });
+
+  it('runs a class with its own leaderboard', async () => {
+    const made = await call('POST', `/mosques/${mosqueId}/classes`, { token: admin.token, body: { name: 'Saturday madrasa' } });
+    expect((await call('POST', `/classes/${made.json.id}/members`, { token: friend.token, body: { striverId: kid, member: true } })).status).toBe(403);
+    await call('POST', `/classes/${made.json.id}/members`, { token: admin.token, body: { striverId: kid, member: true } });
+    expect((await call('GET', `/mosques/${mosqueId}/classes`, { token: admin.token })).json.classes).toEqual([{ id: made.json.id, name: 'Saturday madrasa', members: 1 }]);
+    const page = await call('GET', `/classes/${made.json.id}?period=week`, { token: admin.token });
+    expect(page.json.rows.map((r: any) => r.name)).toEqual(['Sami Khan']);
+    expect(page.json.members).toHaveLength(1);
+    expect((await call('GET', `/mosques/${mosqueId}/roster`, { token: admin.token })).json.people.find((x: any) => x.id === kid).classId).toBe(made.json.id);
+    await call('POST', `/classes/${made.json.id}/members`, { token: admin.token, body: { striverId: kid, member: false } });
+    expect((await call('GET', `/classes/${made.json.id}`, { token: admin.token })).json.rows).toHaveLength(0);
+  });
+
+  it('adds up the world by city and country, and by season', async () => {
+    const owner = (await call('POST', '/auth/login', { body: { email: 'owner@example.com', password: 'password123' } })).json.token;
+    const countries = await call('GET', '/world?period=month&group=country');
+    expect(countries.json.groups[0]).toMatchObject({ name: 'United Kingdom', mosques: 1 });
+    expect((await call('GET', '/world?period=month&group=city')).json.groups[0].name).toBe('London');
+    expect((await call('POST', '/owner/seasons', { token: admin.token, body: { name: 'x', startDate: today, endDate: today } })).status).toBe(403);
+    const season = await call('POST', '/owner/seasons', { token: owner, body: { name: 'Winter 40', startDate: today, endDate: addDays(today, 39) } });
+    const w = await call('GET', `/world?season=${season.json.id}`);
+    expect(w.json.seasons[0]).toMatchObject({ name: 'Winter 40', status: 'active' });
+    // Only check-ins inside the season count: today's two, not the earlier ones.
+    expect(w.json.rows[0].total).toBe(2);
+    await call('DELETE', `/owner/seasons/${season.json.id}`, { token: owner });
+    expect((await call('GET', '/world')).json.seasons).toHaveLength(0);
+  });
+});
+
