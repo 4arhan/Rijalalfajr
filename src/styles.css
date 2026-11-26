@@ -1087,3 +1087,162 @@ a.item {
     transition: none !important;
   }
 }
+
+/* ---------- visitors without an account ---------- */
+.guestbar {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(calc(100% - 24px), calc(var(--col) - 32px));
+  padding: 10px 10px 10px 20px;
+  border-radius: 999px;
+  background: var(--nav-bg);
+  color: #eef8f2;
+  box-shadow: 0 16px 36px -14px rgba(4, 30, 22, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.guestbar b,
+.guestbar small {
+  display: block;
+  line-height: 1.25;
+}
+.guestbar small {
+  color: var(--nav-ink);
+  font-size: 12px;
+}
+.guestbar .btn {
+  background: var(--mint);
+  color: var(--mint-ink);
+}
+
+/* ---------- small pieces for the newer screens ---------- */
+.dots {
+  display: flex;
+  gap: 4px;
+}
+.dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+.dots i.on {
+  background: var(--accent);
+}
+.cal i.ex {
+  background: repeating-linear-gradient(135deg, var(--accent-soft) 0 5px, transparent 5px 10px);
+  border-color: var(--accent);
+}
+.stars {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.stars svg {
+  width: 100%;
+  height: auto;
+  color: var(--line-2);
+}
+.stars svg.on {
+  color: var(--gold);
+  fill: var(--gold);
+  filter: drop-shadow(0 2px 4px rgba(227, 169, 47, 0.45));
+}
+.kids h2 {
+  font-size: 30px;
+}
+.kids .btn {
+  min-height: 64px;
+  font-size: 20px;
+}
+.code-box {
+  font-size: 26px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-align: center;
+  padding: 14px;
+  border-radius: var(--r-block);
+  background: var(--card-2);
+  border: 1px dashed var(--line-2);
+}
+pre.snippet {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ---------- certificates ---------- */
+.cert {
+  background: #fffdf6;
+  color: #1c2a23;
+  border: 10px double #0a7a57;
+  border-radius: 6px;
+  padding: 34px 26px;
+  text-align: center;
+  break-inside: avoid;
+  page-break-after: always;
+}
+.cert .c-kicker {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #0a7a57;
+}
+.cert .c-name {
+  font-size: 34px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  margin: 14px 0 6px;
+  border-bottom: 2px solid #e3a92f;
+  display: inline-block;
+  padding: 0 18px 6px;
+}
+.cert .c-big {
+  font-size: 19px;
+  margin: 10px auto;
+  max-width: 34ch;
+}
+.cert .c-place {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: #e3a92f;
+  color: #2b1d02;
+  font-weight: 750;
+}
+.cert .c-foot {
+  margin-top: 22px;
+  font-size: 13px;
+  color: #5a6a62;
+}
+
+/* ---------- embedded leaderboard ---------- */
+.embed {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 10px;
+}
+.rowbtn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}

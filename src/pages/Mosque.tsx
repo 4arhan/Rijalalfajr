@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BadgeCheck, Flag, HandHeart, Settings2, Sunrise, Trophy, Users, UsersRound } from 'lucide-react';
+import { BadgeCheck, Flag, HandHeart, Settings2, Share2, Sunrise, Trophy, Users, UsersRound } from 'lucide-react';
 import { api, GROUPS, type Group, type MosquePage as MosqueData, type Standing } from '../api';
 import { Eyebrow, Field, LinkRow, Loading, Podium, Problem, RankList, Screen, Seg, Sheet, useAction, useMe, useSession, useToast } from '../ui';
 import { niceDate, plural, timeIn, useLoad } from '../lib/util';
+import { EventList, PledgeList } from './Community';
 
 type Period = 'week' | 'month' | 'all';
 interface Squads {
@@ -32,19 +33,19 @@ export function MosquePage() {
 }
 
 function MosqueView({ id, back }: { id: string; back?: true }) {
-  const me = useMe();
-  const { reload: reloadMe } = useSession();
+  // Visitors can open this page from a link without an account.
+  const { me, reload: reloadMe } = useSession();
   const toast = useToast();
   const [period, setPeriod] = useState<Period>('month');
   const [grp, setGrp] = useState<Group | 'all'>('all');
   const [sheet, setSheet] = useState<'squad' | 'report' | null>(null);
   const [showAll, setShowAll] = useState(false);
   const page = useLoad(() => api<MosqueData>(`/mosques/${id}`), [id]);
-  const board = useLoad(() => api<{ rows: Standing[] }>(`/mosques/${id}/leaderboard?period=${period}`), [id, period]);
+  const board = useLoad(() => api<{ rows: Standing[]; hidden: boolean }>(`/mosques/${id}/leaderboard?period=${period}`), [id, period]);
   const squads = useLoad(() => api<Squads>(`/mosques/${id}/squads`), [id]);
   const act = useAction();
 
-  const mine = useMemo(() => new Set(me.strivers.map((s) => s.id)), [me]);
+  const mine = useMemo(() => new Set(me?.strivers.map((s) => s.id) ?? []), [me]);
   const rows = useMemo(() => {
     const all = board.data?.rows ?? [];
     return grp === 'all' ? all : all.filter((r) => r.grp === grp).map((r, i) => ({ ...r, rank: i + 1 }));
@@ -53,7 +54,19 @@ function MosqueView({ id, back }: { id: string; back?: true }) {
   if (page.error) return <Screen title="Mosque" back={back}><Problem error={page.error} retry={page.reload} /></Screen>;
   if (!page.data) return <Screen title="Mosque" back={back}><Loading /></Screen>;
   const { mosque, window: win, role } = page.data;
-  const isHome = me.strivers.find((s) => s.self)?.homeMosqueId === mosque.id;
+  const isHome = me?.strivers.find((s) => s.self)?.homeMosqueId === mosque.id;
+  const share = async () => {
+    const url = `${location.origin}/m/${mosque.id}`;
+    try {
+      if (navigator.share) await navigator.share({ title: mosque.name, text: `Fajr at ${mosque.name}: the podium`, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast('Link copied');
+      }
+    } catch {
+      /* the share sheet was closed */
+    }
+  };
 
   const makeHome = () =>
     act.run(async () => {
@@ -67,22 +80,28 @@ function MosqueView({ id, back }: { id: string; back?: true }) {
       title={mosque.name}
       back={back}
       eyebrow={<>{[mosque.city, mosque.country].filter(Boolean).join(', ') || 'Mosque'}{mosque.verified && <BadgeCheck size={14} aria-label="Approved mosque" />}</>}
-      action={role && <Link className="iconbtn" to={`/manage/${mosque.id}`} aria-label="Manage mosque"><Settings2 size={19} /></Link>}
+      action={<>
+        <button className="iconbtn" onClick={share} aria-label="Share this mosque's page"><Share2 size={18} /></button>
+        {role && <Link className="iconbtn" to={`/manage/${mosque.id}`} aria-label="Manage mosque"><Settings2 size={19} /></Link>}
+      </>}
     >
       <section className="hero">
         <div className="between">
           <Eyebrow icon={<Trophy size={15} />}>Podium</Eyebrow>
           <span className="muted small">{period === 'week' ? 'Last 7 days' : period === 'month' ? 'Last 30 days' : 'All time'}</span>
         </div>
-        {board.data ? <Podium rows={rows} /> : <Loading />}
+        {!board.data ? <Loading /> : board.data.hidden ? <p className="muted" style={{ marginTop: 12 }}>This mosque shows its leaderboard to people who are signed in.</p> : <Podium rows={rows} />}
       </section>
 
       <Seg value={period} onChange={setPeriod} options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'all', label: 'All time' }]} />
       <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: 'Everyone' }, ...GROUPS.map((g) => ({ value: g, label: mosque.labels[g] }))]} />
 
-      {!isHome && (
+      {me && !isHome && (
         <button className="btn block" onClick={makeHome} disabled={act.busy}>Make this my home mosque</button>
       )}
+
+      <PledgeList pledges={page.data.pledges} admin={role === 'admin'} onChange={page.reload} />
+      <EventList events={page.data.events} signedIn={!!me} staff={!!role} onChange={page.reload} />
 
       <section className="card">
         <Eyebrow icon={<Users size={15} />}>Leaderboard</Eyebrow>
@@ -153,7 +172,7 @@ function MosqueView({ id, back }: { id: string; back?: true }) {
         <span className="grow"><b style={{ display: 'block' }}>Sponsor this mosque</b><span className="muted small">Offer prizes or breakfast. The mosque contacts you.</span></span>
       </Link>
 
-      <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => setSheet('report')}><Flag size={15} /> Report a problem</button>
+      {me && <button className="btn ghost sm" style={{ alignSelf: 'center' }} onClick={() => setSheet('report')}><Flag size={15} /> Report a problem</button>}
 
       {sheet === 'squad' && <SquadSheet mine={squads.data?.mine ?? null} onClose={() => setSheet(null)} onChange={() => { squads.reload(); reloadMe(); }} />}
       {sheet === 'report' && <ReportSheet targetType="mosque" targetId={mosque.id} onClose={() => setSheet(null)} />}

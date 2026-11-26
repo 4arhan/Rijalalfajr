@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HandHeart, Landmark, Plus, Trophy, Users, UsersRound } from 'lucide-react';
 import { api, type ChallengeBrief, type Standing } from '../api';
-import { Eyebrow, LinkRow, Loading, Problem, RankList, Screen, useMe } from '../ui';
+import { Eyebrow, LinkRow, Loading, Problem, RankList, Screen, useSession } from '../ui';
 import { niceDate, plural, useLoad } from '../lib/util';
 import { SponsorCards, type Sponsor } from './Sponsor';
 
@@ -16,8 +16,8 @@ interface OrgData {
 
 export function OrgPage() {
   const { id } = useParams();
-  const me = useMe();
-  const mine = useMemo(() => new Set(me.strivers.map((s) => s.id)), [me]);
+  const { me } = useSession();
+  const mine = useMemo(() => new Set(me?.strivers.map((s) => s.id) ?? []), [me]);
   const { data, error, reload } = useLoad(() => api<OrgData>(`/orgs/${id}`), [id]);
   const sponsors = useLoad(() => api<{ sponsors: Sponsor[] }>(`/orgs/${id}/sponsors`).catch(() => ({ sponsors: [] })), [id]);
   if (error) return <Screen title="Organisation" back><Problem error={error} retry={reload} /></Screen>;

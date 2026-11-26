@@ -871,15 +871,15 @@ export function createApp(opts: AppOptions) {
     const date = markDate(m, c.get('now'), c.req.query('date'));
     const rows = await db.query<{
       id: string; name: string; grp: Group; managed: boolean; card_code: string; checkin_mosque: string | null; method: string | null; at: Date | null;
-      class_id: string | null; excused: boolean;
+      class_id: string | null; excused: boolean; member: boolean;
     }>(
       `select s.id, s.name, s.grp, (s.managed_mosque_id is not null) as managed, s.card_code,
-              c.mosque_id as checkin_mosque, c.method, c.at, s.class_id, (e.striver_id is not null) as excused
+              c.mosque_id as checkin_mosque, c.method, c.at, s.class_id, (e.striver_id is not null) as excused, true as member
        from strivers s left join checkins c on c.striver_id = s.id and c.fajr_date = $2
          left join excuses e on e.striver_id = s.id and e.fajr_date = $2
        where s.home_mosque_id = $1
        union
-       select s.id, s.name, s.grp, false, s.card_code, c.mosque_id, c.method, c.at, null, false
+       select s.id, s.name, s.grp, false, s.card_code, c.mosque_id, c.method, c.at, null, false, false
        from checkins c join strivers s on s.id = c.striver_id
        where c.mosque_id = $1 and c.fajr_date = $2 and s.home_mosque_id is distinct from $1
        order by 2`,
@@ -890,7 +890,7 @@ export function createApp(opts: AppOptions) {
       people: rows.map((r) => ({
         id: r.id, name: r.name, grp: r.grp, managed: r.managed, cardCode: r.card_code,
         present: r.checkin_mosque !== null, here: r.checkin_mosque === id, method: r.method, at: r.at,
-        classId: r.class_id, excused: r.excused,
+        classId: r.class_id, excused: r.excused, member: r.member,
       })),
     });
   });

@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Flag, HandHeart, Landmark } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarRange, Flag, HandHeart, Landmark } from 'lucide-react';
 import type { Sponsor } from './Sponsor';
 import { api } from '../api';
-import { Eyebrow, Loading, Problem, Screen, useAction } from '../ui';
+import { Eyebrow, Field, Loading, Problem, Screen, useAction } from '../ui';
 import { useLoad } from '../lib/util';
 
 interface OwnerData {
@@ -10,11 +11,14 @@ interface OwnerData {
   reports: { id: string; target_type: string; target_id: string; reason: string; reporter: string | null }[];
   totals: { users: number; strivers: number; mosques: number; checkins: number };
   sponsors: Sponsor[];
+  seasons: { id: string; name: string; startDate: string; endDate: string }[];
 }
 
 export function OwnerPage() {
   const { data, error, reload } = useLoad(() => api<OwnerData>('/owner'), []);
   const act = useAction();
+  const today = new Date().toISOString().slice(0, 10);
+  const [season, setSeason] = useState({ name: '', startDate: today, endDate: today });
   if (error) return <Screen title="Owner console" back="/me"><Problem error={error} retry={reload} /></Screen>;
   if (!data) return <Screen title="Owner console" back="/me"><Loading /></Screen>;
   const setMosque = (id: string, body: object) => act.run(async () => { await api(`/owner/mosques/${id}`, { body }); reload(); });
@@ -47,6 +51,22 @@ export function OwnerPage() {
             ))}
           </div>
         ) : <p className="muted small">No open reports.</p>}
+      </section>
+      <section className="card form">
+        <Eyebrow icon={<CalendarRange size={15} />}>Worldwide seasons</Eyebrow>
+        <p className="muted small">A season is a world table for a set of dates, such as a winter 40 days. Every approved mosque takes part.</p>
+        {data.seasons.map((s) => (
+          <div className="between" key={s.id}>
+            <span><b>{s.name}</b><span className="muted small" style={{ display: 'block' }}>{s.startDate} to {s.endDate}</span></span>
+            <button className="btn sm danger" disabled={act.busy} onClick={() => confirm('Delete this season?') && act.run(async () => { await api(`/owner/seasons/${s.id}`, { method: 'DELETE' }); reload(); })}>Delete</button>
+          </div>
+        ))}
+        <Field label="New season"><input value={season.name} onChange={(e) => setSeason({ ...season, name: e.target.value })} maxLength={60} placeholder="e.g. Winter 40 Days of Fajr" /></Field>
+        <div className="grid2">
+          <Field label="First day"><input type="date" value={season.startDate} onChange={(e) => setSeason({ ...season, startDate: e.target.value })} /></Field>
+          <Field label="Last day"><input type="date" value={season.endDate} onChange={(e) => setSeason({ ...season, endDate: e.target.value })} /></Field>
+        </div>
+        <button className="btn" disabled={act.busy || season.name.trim().length < 2} onClick={() => act.run(async () => { await api('/owner/seasons', { body: season }); setSeason({ ...season, name: '' }); reload(); })}>Start season</button>
       </section>
       <section className="card">
         <Eyebrow icon={<HandHeart size={15} />}>Sponsor offers</Eyebrow>

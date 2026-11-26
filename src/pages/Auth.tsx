@@ -18,8 +18,10 @@ export function AuthForm({ onDone }: { onDone?: () => void }) {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     act.run(async () => {
-      const body = mode === 'signup' ? { email, password, name, grp } : { email, password };
+      const inviteCode = localStorage.getItem('raf.invite') ?? undefined;
+      const body = mode === 'signup' ? { email, password, name, grp, inviteCode } : { email, password };
       const { token } = await api<{ token: string }>(`/auth/${mode}`, { body });
+      localStorage.removeItem('raf.invite');
       await signIn(token);
       onDone?.();
     });
@@ -28,6 +30,9 @@ export function AuthForm({ onDone }: { onDone?: () => void }) {
   return (
     <form className="form" onSubmit={submit}>
       <Seg value={mode} onChange={setMode} options={[{ value: 'signup', label: 'Create account' }, { value: 'login', label: 'Sign in' }]} />
+      {mode === 'signup' && localStorage.getItem('raf.invite') && (
+        <div className="note">A friend invited you. You will start at their mosque, as their Fajr buddy.</div>
+      )}
       {mode === 'signup' && (
         <>
           <Field label="Your name" hint="Shown on your mosque's leaderboard. You can hide it later.">

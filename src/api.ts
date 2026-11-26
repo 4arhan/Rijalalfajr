@@ -47,9 +47,10 @@ export interface Striver {
   squadId: string | null;
   anonymous: boolean;
   cardCode: string;
+  weeklyGoal: number;
 }
 export interface Me {
-  user: { id: string; email: string; name: string; owner: boolean };
+  user: { id: string; email: string; name: string; owner: boolean; inviteCode: string };
   strivers: Striver[];
   staff: { id: string; name: string; role: 'admin' | 'volunteer' }[];
   orgs: { id: string; name: string }[];
@@ -73,6 +74,9 @@ export interface Mosque {
   suspended: boolean;
   orgId: string | null;
   labels: Labels;
+  fajrTime: string | null;
+  iqamahTime: string | null;
+  publicBoard: boolean;
 }
 export interface Win {
   open: boolean;
@@ -93,7 +97,26 @@ export interface ChallengeBrief {
   scopeType?: string;
   status: 'upcoming' | 'active' | 'ended';
 }
+export interface MosqueEvent {
+  id: string;
+  date: string;
+  title: string;
+  detail: string;
+  going: number;
+  mine: boolean;
+}
+export interface Pledge {
+  id: string;
+  reward: string;
+  target: number;
+  startDate: string;
+  endDate: string;
+  sponsor: string;
+  progress: number;
+}
 export interface MosquePage {
+  events: MosqueEvent[];
+  pledges: Pledge[];
   mosque: Mosque;
   window: Win;
   todayCount: number;
@@ -138,6 +161,9 @@ export interface Stats {
   best: number;
   doneToday: boolean;
   dates: string[];
+  excused: string[];
+  weeklyGoal: number;
+  weekDays: number;
   recent: { date: string; mosque: string }[];
   mosques: number;
   rank: number | null;

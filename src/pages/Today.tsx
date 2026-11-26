@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Check, Landmark, MoonStar, Trophy, Users } from 'lucide-react';
+import { ArrowRight, Award, BellRing, BookOpen, Check, HeartHandshake, Landmark, MoonStar, Target, Trophy, Users } from 'lucide-react';
 import { api, type MosquePage as MosqueData, type Stats } from '../api';
 import { Eyebrow, Loading, Problem, Ring, Screen, useMe } from '../ui';
-import { HADITH, hijri, plural, timeIn, untilText, useLoad, useNow } from '../lib/util';
+import { HADITH, addDays, hijri, plural, timeIn, untilText, useLoad, useNow } from '../lib/util';
+import { EventList, PledgeList } from './Community';
+import type { BuddyData } from './Personal';
 
 const MILESTONES = [3, 7, 14, 21, 40, 100, 200, 365];
 
@@ -12,17 +14,21 @@ export function TodayPage() {
   const family = me.strivers.filter((s) => !s.self);
   const now = useNow();
   const { data, error, reload } = useLoad(async () => {
-    const [stats, home, fam] = await Promise.all([
+    const [stats, home, fam, pals] = await Promise.all([
       api<Stats>(`/strivers/${self.id}/stats`),
       self.homeMosqueId ? api<MosqueData>(`/mosques/${self.homeMosqueId}`) : null,
       Promise.all(family.map((f) => api<Stats>(`/strivers/${f.id}/stats`))),
+      api<BuddyData>('/buddies'),
     ]);
-    return { stats, home, fam };
+    return { stats, home, fam, pals };
   }, [self.id, self.homeMosqueId, family.length]);
 
   if (error) return <Screen title="Today"><Problem error={error} retry={reload} /></Screen>;
   if (!data) return <Screen title="Today"><Loading /></Screen>;
-  const { stats, home, fam } = data;
+  const { stats, home, fam, pals } = data;
+  // A challenge that finished in the last two weeks is announced here.
+  const finished = home?.challenges.find((c) => c.status === 'ended' && c.endDate >= addDays(stats.today, -14));
+  const week = Array.from({ length: 7 }, (_, i) => addDays(stats.today, i - 6));
   const goal = MILESTONES.find((m) => m > stats.streak) ?? 365;
   const win = home?.window;
   const tz = home?.mosque.timezone ?? 'UTC';
@@ -82,6 +88,37 @@ export function TodayPage() {
         )}
       </section>
 
+      {pals.nudges.length > 0 && (
+        <div className="note between">
+          <span className="row"><BellRing size={18} /> <span><b>{pals.nudges.map((n) => n.name.split(' ')[0]).join(', ')}</b> nudged you: see you at Fajr.</span></span>
+          <button className="btn soft sm" onClick={async () => { await api('/nudges/seen', { method: 'POST' }); reload(); }}>OK</button>
+        </div>
+      )}
+
+      {stats.weeklyGoal > 0 && (
+        <section className="card">
+          <div className="between">
+            <Eyebrow icon={<Target size={15} />}>My week</Eyebrow>
+            <span className="small num"><b>{stats.weekDays}</b> of {stats.weeklyGoal} dawns</span>
+          </div>
+          <div className="meter"><i style={{ width: `${Math.min(100, (stats.weekDays / stats.weeklyGoal) * 100)}%` }} /></div>
+          <p className="muted small" style={{ marginTop: 8 }}>
+            {stats.weekDays >= stats.weeklyGoal ? 'You reached your goal for this week. Keep going.' : `${stats.weeklyGoal - stats.weekDays} more to reach your goal by Sunday.`}
+          </p>
+        </section>
+      )}
+
+      {finished && (
+        <Link to={`/challenge/${finished.id}`} className="card row" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span className="icon"><Award size={20} /></span>
+          <span className="grow">
+            <span className="eyebrow">The results are in</span>
+            <b className="truncate" style={{ display: 'block' }}>{finished.name}: see the winners</b>
+          </span>
+          <ArrowRight size={18} className="muted" />
+        </Link>
+      )}
+
       {home ? (
         <section className="card">
           <Eyebrow icon={<Landmark size={15} />}>Your mosque</Eyebrow>
@@ -113,6 +150,9 @@ export function TodayPage() {
         </section>
       )}
 
+      {home && <PledgeList pledges={home.pledges} admin={false} onChange={reload} />}
+      {home && <EventList events={home.events} signedIn staff={false} onChange={reload} />}
+
       {challenge && (
         <Link to={`/challenge/${challenge.id}`} className="card row" style={{ textDecoration: 'none', color: 'inherit' }}>
           <span className="icon"><Trophy size={20} /></span>
@@ -129,15 +169,38 @@ export function TodayPage() {
           <Eyebrow icon={<Users size={15} />}>Family</Eyebrow>
           <div className="list">
             {fam.map((f) => (
-              <div className="item" key={f.striver.id}>
+              <Link className="item" key={f.striver.id} to={`/kids/${f.striver.id}`}>
                 <span className={`check${f.doneToday ? ' on' : ''}`}><Check size={16} /></span>
-                <span className="grow"><b>{f.striver.name}</b></span>
-                <span className="sub num">{plural(f.streak, 'day')} in a row</span>
-              </div>
+                <span className="grow">
+                  <b>{f.striver.name}</b>
+                  <span className="sub num" style={{ display: 'block' }}>{plural(f.streak, 'day')} in a row</span>
+                </span>
+                <span className="dots" aria-hidden="true">{week.map((d) => <i key={d} className={f.dates.includes(d) ? 'on' : ''} />)}</span>
+              </Link>
             ))}
           </div>
         </section>
       )}
+
+      <section className="card">
+        <div className="between" style={{ marginBottom: 6 }}>
+          <Eyebrow icon={<HeartHandshake size={15} />}>Fajr buddies</Eyebrow>
+          <Link to="/buddies" className="btn soft sm">{pals.buddies.length ? 'All buddies' : 'Find a buddy'}</Link>
+        </div>
+        {pals.buddies.length ? (
+          <div className="list">
+            {pals.buddies.slice(0, 3).map((b) => (
+              <div className="item" key={b.striverId}>
+                <span className={`check${b.doneToday ? ' on' : ''}`}><Check size={16} /></span>
+                <span className="grow"><b>{b.name}</b></span>
+                <span className="sub num">{b.doneToday ? 'At Fajr today' : 'Not yet today'} · {b.streak} in a row</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="muted small">Pair up with a friend. You each see whether the other made it to Fajr, and can nudge.</p>
+        )}
+      </section>
 
       <section className="card">
         <Eyebrow icon={<BookOpen size={15} />}>Why Fajr</Eyebrow>

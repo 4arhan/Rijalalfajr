@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BarChart3, Check, ClipboardList, Download, HandHeart, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, X } from 'lucide-react';
-import { api, GROUPS, type Group, type MosquePage as MosqueData, type Standing, type Win } from '../api';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { BarChart3, Check, ClipboardList, CalendarPlus, Download, GraduationCap, HandHeart, ImageDown, Share2, Target, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, WifiOff, X } from 'lucide-react';
+import { api, ApiError, GROUPS, type Group, type MosquePage as MosqueData, type Standing, type Win } from '../api';
+import { keepTick, pendingTicks, saveList, savedList, sendTicks } from '../lib/offline';
 import { Eyebrow, Field, LinkRow, Loading, Problem, Qr, Scanner, Screen, Seg, Sheet, useAction, useToast } from '../ui';
 import { addDays, niceDate, plural, timeIn, useLoad } from '../lib/util';
+import { EmbedSheet, EventList, EventSheet, PledgeList, PledgeSheet } from './Community';
+import { sharePoster } from '../lib/share';
 
 interface StatsData { today: string; days: { date: string; count: number; byPhone: number }[]; members: number; visitors: number; flags: { fajr_date: string; n: number }[] }
 
@@ -12,12 +15,34 @@ export function ManagePage() {
   const toast = useToast();
   const page = useLoad(() => api<MosqueData>(`/mosques/${id}`), [id]);
   const stats = useLoad(() => api<StatsData>(`/mosques/${id}/stats`), [id]);
+  const [sheet, setSheet] = useState<'event' | 'pledge' | 'embed' | null>(null);
   if (page.error || stats.error) return <Screen title="Manage" back="/me"><Problem error={(page.error ?? stats.error)!} retry={() => { page.reload(); stats.reload(); }} /></Screen>;
   if (!page.data || !stats.data) return <Screen title="Manage" back="/me"><Loading /></Screen>;
   const { mosque, window: win } = page.data;
   const admin = page.data.role === 'admin';
   const max = Math.max(1, ...stats.data.days.map((d) => d.count));
   const avg = Math.round(stats.data.days.reduce((a, d) => a + d.count, 0) / 14);
+
+  // An image of this week's podium and attendance, for the mosque's own Instagram.
+  const poster = async () => {
+    try {
+      const board = await api<{ rows: Standing[] }>(`/mosques/${id}/leaderboard?period=week`);
+      const week = stats.data!.days.slice(-7);
+      const total = week.reduce((a, d) => a + d.count, 0);
+      // A public image: first name and an initial.
+      const short = (n: string) => { const w = n.trim().split(/\s+/); return w.length < 2 ? n : `${w[0]} ${w[w.length - 1][0]}.`; };
+      await sharePoster({
+        mosque: mosque.name,
+        place: [mosque.city, mosque.country].filter(Boolean).join(', '),
+        podium: board.rows.slice(0, 3).map((r) => ({ name: short(r.name), days: r.days })),
+        total,
+        average: Math.round(total / 7),
+        best: Math.max(...week.map((d) => d.count)),
+      });
+    } catch (e) {
+      toast((e as Error).message);
+    }
+  };
 
   const exportCsv = async () => {
     try {
@@ -67,6 +92,34 @@ export function ManagePage() {
         <LinkRow to={`/m/${id}`} icon={<Monitor size={19} />} title="Public page" sub="What your congregation sees" />
       </section>
 
+      <section className="card tight">
+        <LinkRow to={`/manage/${id}/classes`} icon={<GraduationCap size={19} />} title="Classes" sub="A leaderboard and attendance for each class" />
+        <button className="item" onClick={() => setSheet('event')}>
+          <span className="icon"><CalendarPlus size={19} /></span>
+          <span className="grow"><b>After Fajr</b><span className="sub" style={{ display: 'block' }}>Post breakfast, a halaqah or football</span></span>
+        </button>
+        {admin && (
+          <button className="item" onClick={() => setSheet('pledge')}>
+            <span className="icon"><Target size={19} /></span>
+            <span className="grow"><b>Shared target</b><span className="sub" style={{ display: 'block' }}>A reward when the whole mosque reaches a number</span></span>
+          </button>
+        )}
+        <button className="item" onClick={poster}>
+          <span className="icon"><ImageDown size={19} /></span>
+          <span className="grow"><b>Weekly poster</b><span className="sub" style={{ display: 'block' }}>This week's podium as an image to post</span></span>
+        </button>
+        <button className="item" onClick={() => setSheet('embed')}>
+          <span className="icon"><Share2 size={19} /></span>
+          <span className="grow"><b>Share your leaderboard</b><span className="sub" style={{ display: 'block' }}>A public link, and code for your website</span></span>
+        </button>
+      </section>
+
+      <PledgeList pledges={page.data.pledges} admin={admin} onChange={page.reload} />
+      <EventList events={page.data.events} signedIn={false} staff onChange={page.reload} />
+      {sheet === 'event' && <EventSheet mosqueId={id!} today={win.today} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); page.reload(); toast('Posted'); }} />}
+      {sheet === 'pledge' && <PledgeSheet mosqueId={id!} today={win.today} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); page.reload(); toast('Target set'); }} />}
+      {sheet === 'embed' && <EmbedSheet mosqueId={id!} onClose={() => setSheet(null)} />}
+
       <section className="card">
         <div className="between" style={{ marginBottom: 12 }}>
           <Eyebrow icon={<BarChart3 size={15} />}>Last 14 days</Eyebrow>
@@ -97,27 +150,78 @@ export function ManagePage() {
 
 // ---------- attendance list ----------
 
-interface Person { id: string; name: string; grp: Group; managed: boolean; cardCode: string; present: boolean; here: boolean; method: string | null }
-interface Roster { date: string; people: Person[] }
+interface Person { id: string; name: string; grp: Group; managed: boolean; cardCode: string; present: boolean; here: boolean; method: string | null; classId: string | null; excused: boolean; member: boolean; queued?: boolean }
+interface Roster { date: string; people: Person[]; offline?: boolean }
 
 export function AttendancePage() {
   const { id } = useParams();
+  const [params, setParams] = useSearchParams();
+  const classId = params.get('class');
   const toast = useToast();
   const [back, setBack] = useState(0);
   const [today, setToday] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [grp, setGrp] = useState<Group | 'all'>('all');
   const [sheet, setSheet] = useState<'add' | 'scan' | null>(null);
-  const date = today ? addDays(today, -back) : undefined;
-  const { data, error, reload, setData } = useLoad(() => api<Roster>(`/mosques/${id}/roster${date ? `?date=${date}` : ''}`), [id, date]);
+  const [waiting, setWaiting] = useState(() => pendingTicks(id!).length);
+  // Today's list is asked for without a date, so learning today's date does not fetch it a second time
+  // (a second answer could arrive after a tick and undo it on screen).
+  const date = back === 0 || !today ? undefined : addDays(today, -back);
+  const classes = useLoad(() => (classId ? api<{ classes: { id: string; name: string }[] }>(`/mosques/${id}/classes`) : Promise.resolve({ classes: [] })), [id, classId]);
+
+  // With no signal, fall back to the list as it was last loaded on this phone.
+  const { data, error, reload, setData } = useLoad(async () => {
+    const key = `${id}.${date ?? 'latest'}`;
+    try {
+      const r = await api<Roster>(`/mosques/${id}/roster${date ? `?date=${date}` : ''}`);
+      saveList(key, r);
+      saveList(`${id}.${r.date}`, r);
+      return { ...r, offline: false };
+    } catch (e) {
+      const kept = e instanceof ApiError && e.code === 'offline' ? savedList<Roster>(key) : null;
+      if (!kept) throw e;
+      return { ...kept, offline: true };
+    }
+  }, [id, date]);
   useEffect(() => {
     if (data && !today) setToday(data.date);
   }, [data, today]);
 
+  const sync = useCallback(async (quiet = false) => {
+    if (!pendingTicks(id!).length) return;
+    const r = await sendTicks(id!);
+    setWaiting(r.left);
+    if (r.sent) {
+      toast(`${plural(r.sent, 'tick')} sent`);
+      reload();
+    } else if (!quiet && r.left) toast('Still no signal. Your ticks are safe on this phone.');
+  }, [id, reload, toast]);
+  useEffect(() => {
+    sync(true);
+    const again = () => sync(true);
+    window.addEventListener('online', again);
+    const timer = setInterval(again, 20000);
+    return () => {
+      window.removeEventListener('online', again);
+      clearInterval(timer);
+    };
+  }, [sync]);
+
+  // What is shown: the loaded list with any waiting ticks laid over it.
+  const shown = useMemo(() => {
+    if (!data) return [];
+    const queued = pendingTicks(id!).filter((t) => t.date === data.date);
+    return data.people.map((p) => {
+      const t = queued.find((x) => x.striverId === p.id);
+      return t ? { ...p, present: t.present, here: t.present, method: t.present ? 'list' : null, queued: true } : { ...p, queued: false };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, waiting, id]);
+
   const people = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return (data?.people ?? []).filter((p) => (grp === 'all' || p.grp === grp) && (!t || p.name.toLowerCase().includes(t)));
-  }, [data, q, grp]);
+    return shown.filter((p) => (grp === 'all' || p.grp === grp) && (!classId || p.classId === classId) && (!t || p.name.toLowerCase().includes(t)));
+  }, [shown, q, grp, classId]);
 
   const toggle = async (p: Person) => {
     if (p.present && !p.here) return toast(`${p.name} checked in at another mosque that day`);
@@ -127,6 +231,24 @@ export function AttendancePage() {
     try {
       await api(`/mosques/${id}/mark`, { body: { striverId: p.id, date: data!.date, present } });
     } catch (e) {
+      if (e instanceof ApiError && e.code === 'offline') {
+        keepTick({ mosqueId: id!, striverId: p.id, date: data!.date, present });
+        setWaiting(pendingTicks(id!).length);
+        if (!waiting) toast('No signal. Saved on this phone; it will send when the signal is back.');
+        return;
+      }
+      toast((e as Error).message);
+      reload();
+    }
+  };
+
+  const excuse = async (p: Person) => {
+    const excused = !p.excused;
+    setData((d) => d && { ...d, people: d.people.map((x) => (x.id === p.id ? { ...x, excused } : x)) });
+    try {
+      await api(`/mosques/${id}/excuse`, { body: { striverId: p.id, date: data!.date, excused } });
+      toast(excused ? `${p.name} is excused for this day. Their streak is safe.` : `${p.name} is no longer excused`);
+    } catch (e) {
       toast((e as Error).message);
       reload();
     }
@@ -134,29 +256,39 @@ export function AttendancePage() {
 
   // Type a name: if it is not on the list yet, add it and mark it here in one tap.
   const typed = q.trim();
-  const known = (data?.people ?? []).some((p) => p.name.toLowerCase() === typed.toLowerCase());
+  const known = shown.some((p) => p.name.toLowerCase() === typed.toLowerCase());
   const quickAdd = async (g: Group) => {
     try {
       const r = await api<{ id: string }>(`/mosques/${id}/roster`, { body: { name: typed, grp: g } });
       await api(`/mosques/${id}/mark`, { body: { striverId: r.id, date: data!.date } });
+      if (classId) await api(`/classes/${classId}/members`, { body: { striverId: r.id, member: true } });
       toast(`${typed} is added and marked here`);
       setQ('');
       reload();
     } catch (e) {
-      toast((e as Error).message);
+      toast(e instanceof ApiError && e.code === 'offline' ? 'Adding a new name needs a signal. Ticking names works without one.' : (e as Error).message);
     }
   };
 
-  const count = data?.people.filter((p) => p.here).length ?? 0;
+  const count = people.filter((p) => p.here).length;
+  const className = classes.data?.classes.find((k) => k.id === classId)?.name;
   return (
-    <Screen title="Attendance list" eyebrow={data ? niceDate(data.date, { weekday: 'long', day: 'numeric', month: 'long' }) : ''} back={`/manage/${id}`}
+    <Screen title={className ?? 'Attendance list'} eyebrow={data ? niceDate(data.date, { weekday: 'long', day: 'numeric', month: 'long' }) : ''} back={classId ? `/class/${classId}` : `/manage/${id}`}
       action={<button className="iconbtn" aria-label="Scan a member card" onClick={() => setSheet('scan')}><ScanLine size={19} /></button>}>
       <Seg value={String(back)} onChange={(v) => setBack(Number(v))} options={[{ value: '0', label: 'Today' }, { value: '1', label: 'Yesterday' }, { value: '2', label: '2 days ago' }]} />
+      {(waiting > 0 || data?.offline) && (
+        <div className="note between">
+          <span className="row"><WifiOff size={18} /> <span>{waiting > 0 ? `${plural(waiting, 'tick')} saved on this phone, waiting for a signal.` : 'No signal. Showing the list saved on this phone.'}</span></span>
+          <button className="btn soft sm" onClick={() => (waiting ? sync() : reload())}>Try now</button>
+        </div>
+      )}
       <div className="row">
         <label className="field grow"><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a name" aria-label="Type a name" /></label>
         <button className="btn soft" onClick={() => setSheet('add')}><UserPlus size={18} /> Add</button>
       </div>
-      <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: 'Everyone' }, ...GROUPS.map((g) => ({ value: g, label: g[0].toUpperCase() + g.slice(1) }))]} />
+      {classId
+        ? <div className="between small"><span className="pill">Class: {className ?? '…'}</span><button className="btn ghost sm" onClick={() => setParams({})}>Show everyone</button></div>
+        : <Seg value={grp} onChange={setGrp} options={[{ value: 'all', label: 'Everyone' }, ...GROUPS.map((g) => ({ value: g, label: g[0].toUpperCase() + g.slice(1) }))]} />}
       {data && typed.length >= 2 && !known && people.length === 0 && (
         <div className="note">
           <b>“{typed}”</b> is not on the list. Add and mark here as:
@@ -168,25 +300,31 @@ export function AttendancePage() {
       <section className="card">
         <div className="between" style={{ marginBottom: 6 }}>
           <Eyebrow icon={<ClipboardList size={15} />}>{plural(count, 'person', 'people')} here</Eyebrow>
-          <span className="muted small">{data ? `${data.people.length} on the list` : ''}</span>
+          <span className="muted small">{data ? `${people.length} on the list` : ''}</span>
         </div>
         {error ? <Problem error={error} retry={reload} /> : !data ? <Loading /> : people.length ? (
           <div className="list">
             {people.map((p) => (
-              <button key={p.id} className="item" onClick={() => toggle(p)} aria-pressed={p.present}>
-                <span className={`check${p.present ? ' on' : ''}`}><Check size={16} /></span>
-                <span className="grow">
-                  <b>{p.name}</b>
-                  <span className="sub" style={{ display: 'block' }}>
-                    {p.grp[0].toUpperCase() + p.grp.slice(1)}
-                    {p.present && (p.here ? ` · ${p.method === 'list' ? 'ticked here' : p.method === 'card' ? 'card scanned' : 'checked in by phone'}` : ' · at another mosque')}
+              <div key={p.id} className="item">
+                <button className="rowbtn" onClick={() => toggle(p)} aria-pressed={p.present}>
+                  <span className={`check${p.present ? ' on' : ''}`}><Check size={16} /></span>
+                  <span className="grow">
+                    <b>{p.name}</b>
+                    <span className="sub" style={{ display: 'block' }}>
+                      {p.grp[0].toUpperCase() + p.grp.slice(1)}
+                      {p.present && (p.here ? ` · ${p.queued ? 'waiting to send' : p.method === 'list' ? 'ticked here' : p.method === 'card' ? 'card scanned' : 'checked in by phone'}` : ' · at another mosque')}
+                      {!p.present && p.excused && ' · excused'}
+                    </span>
                   </span>
-                </span>
-              </button>
+                </button>
+                {!p.present && p.member && (
+                  <button className={`btn sm ${p.excused ? 'soft' : 'ghost'}`} aria-pressed={p.excused} onClick={() => excuse(p)}>{p.excused ? 'Excused' : 'Excuse'}</button>
+                )}
+              </div>
             ))}
           </div>
         ) : (
-          <div className="empty"><b>{data.people.length ? 'No one matches' : 'The list is empty'}</b>Add children and anyone without a phone. People with the app appear here once this is their home mosque.</div>
+          <div className="empty"><b>{shown.length ? 'No one matches' : 'The list is empty'}</b>Add children and anyone without a phone. People with the app appear here once this is their home mosque.</div>
         )}
       </section>
       {data && typed.length >= 2 && !known && people.length > 0 && (
@@ -195,6 +333,7 @@ export function AttendancePage() {
           {GROUPS.map((g, i) => <span key={g}>{i > 0 && ', '}<button className="btn soft sm" onClick={() => quickAdd(g)}>{g[0].toUpperCase() + g.slice(1)}</button></span>)}
         </p>
       )}
+      <p className="muted small">Excuse a member for illness or travel and the day does not break their streak. It does not count as a day attended.</p>
       {sheet === 'add' && <AddPerson mosqueId={id!} onClose={() => setSheet(null)} onAdded={() => { setSheet(null); reload(); }} />}
       {sheet === 'scan' && <CardScan mosqueId={id!} date={data?.date} onClose={() => { setSheet(null); reload(); }} />}
     </Screen>

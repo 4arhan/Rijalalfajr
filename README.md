@@ -11,25 +11,30 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 **Check-in**
 - A QR code on the mosque's screen that changes every 30 seconds.
 - A printed poster whose code only works while the phone is at the mosque.
-- An attendance list for children and anyone without a phone: type a name to tick it, or add and mark a new name in one tap, and printed member cards a volunteer can scan.
-- A parent checks in their children on the same scan.
-- Open only around Fajr: from shortly before the adhan until sunrise, worked out from the mosque's location.
+- An attendance list for children and anyone without a phone: type a name to tick it, or add and mark a new name in one tap. Ticks made with no signal are kept on the phone and sent when it returns.
+- Printed member cards a volunteer can scan, and a parent checking in their children on the same scan.
+- Open only around Fajr: from shortly before the adhan until sunrise, worked out from the mosque's location, or from the Fajr and iqamah times the mosque enters itself.
 - One check-in per person per Fajr, at any registered mosque.
+- A mosque can excuse a member's day (illness, travel) so it does not break a streak.
 
 **Competition**
 - A podium (1st, 2nd, 3rd) and leaderboard at each mosque, by week, month and all time, for everyone or by group.
-- Challenges with dates and prizes set by the mosque admin: a prize per place, and rewards for reaching a number of days.
-- Organisations that group several mosques under one leaderboard, with their own challenges and prizes.
-- A world leaderboard of approved mosques, by total check-ins or by consistency.
+- Challenges with dates and prizes set by the mosque admin. When one ends, winners are shown and certificates can be printed.
+- A shared target for the whole mosque, with a reward and an optional sponsor.
+- Classes, each with its own leaderboard and attendance list.
 - Squads of up to 10 friends inside a mosque.
+- Organisations that group several mosques under one leaderboard, with their own challenges and prizes.
+- A world leaderboard of approved mosques, by total check-ins or by consistency, added up by city and by country, with worldwide seasons the owner starts.
+
+**For each person**: streaks, a weekly goal, a calendar, ten badges, family members, a star chart for children, Fajr buddies with nudges, invitation links, a year in review, share cards, light and dark mode, hiding your name, deleting your account.
+
+**Sharing**: a mosque's page opens from a link without an account (names shown as a first name and an initial; a mosque can turn this off), a leaderboard to embed on the mosque's website, and a weekly poster image.
+
+**For mosque staff**: the mosque screen, attendance list, poster and cards to print, events after Fajr with a count of who is staying, a 14-day chart, CSV export, sponsor offers, admins and volunteers, practice mode.
 
 **Sponsors**: anyone can offer to sponsor, choose how (prizes, breakfast, funds, vouchers), and choose who may contact them: every mosque in their country, or one mosque. Only mosque and organisation admins see their contact details.
 
-**For each person**: streaks, a calendar, nine badges, family members, a share card, light and dark mode, hiding your name, deleting your account.
-
-**For mosque staff**: the mosque screen, attendance list, poster and cards to print, a 14-day chart, CSV export, admins and volunteers, practice mode.
-
-**For the owner**: approve mosques for the world leaderboard, suspend a mosque, handle reports.
+**For the owner**: approve mosques for the world leaderboard, suspend a mosque, start seasons, handle reports, remove sponsor offers.
 
 ## Run it
 
@@ -46,7 +51,7 @@ The seed creates a demo account: `demo@rijalalfajr.app` / `fajr-demo-1`. To give
 To try check-in outside Fajr hours, turn on **Practice mode** in the mosque's settings.
 
 ```bash
-npm test         # API tests: check-in rules, QR expiry, location, leaderboards, challenges
+npm test         # API tests: check-in rules, QR expiry, location, leaderboards, challenges and the rest
 npm run build    # type-check and build to dist/
 npm start        # serve the built app and the API together on port 8787
 ```
@@ -75,6 +80,8 @@ The Vercel setup has not been deployed yet, so treat the first deployment as a t
 | `server/db.ts` | The schema and the two database drivers |
 | `src/pages/` | One file per screen |
 | `src/ui.tsx` | Shared pieces: session, podium, QR display, camera scanner |
+| `src/lib/offline.ts` | Attendance ticks kept on the phone when there is no signal |
+| `public/sw.js` | Keeps the app shell on the phone so it opens offline |
 | `about/` | The about page |
 | `tests/` | API tests |
 
@@ -88,4 +95,4 @@ Ranking is by days attended, then longest streak, then earliest average arrival.
 
 ## Next
 
-Native apps for the App Store and Google Play, Fajr reminder notifications, Arabic and other languages, sign in with Google or Apple, a map of mosques, certificates.
+Native apps for the App Store and Google Play, Fajr reminder notifications (nudges are in-app only for now), Arabic and other languages, sign in with Google or Apple, a map of mosques.

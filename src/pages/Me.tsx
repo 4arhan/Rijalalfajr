@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Award, Building2, HandHeart, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck, Sparkles, Star,
+  Award, Baby, Building2, CalendarRange, HandHeart, HeartHandshake, Send, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck, Sparkles, Star,
   Sun, Sunrise, Trash2, Trophy, UserRound, Users, UsersRound,
 } from 'lucide-react';
 import { api, GROUPS, type Group, type Stats, type Striver } from '../api';
 import { Eyebrow, Field, LinkRow, Loading, Problem, Screen, Sheet, Switch, useAction, useMe, useSession, useToast } from '../ui';
 import { addDays, plural, useLoad } from '../lib/util';
+import { shareInvite } from './Personal';
 import { shareCard } from '../lib/share';
 
 const BADGE_ICON: Record<string, React.ReactNode> = {
@@ -16,6 +17,7 @@ const BADGE_ICON: Record<string, React.ReactNode> = {
 
 function Calendar({ stats }: { stats: Stats }) {
   const on = new Set(stats.dates);
+  const excused = new Set(stats.excused);
   // Five weeks ending this week, Monday first.
   const [y, m, d] = stats.today.split('-').map(Number);
   const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
@@ -25,8 +27,8 @@ function Calendar({ stats }: { stats: Stats }) {
     <div className="cal">
       {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x, i) => <span className="dow" key={i}>{x}</span>)}
       {days.map((day) => (
-        <i key={day} className={`${on.has(day) ? 'on' : ''}${day === stats.today ? ' today' : ''}`} style={day > stats.today ? { opacity: 0.35 } : undefined}
-          aria-label={`${day}${on.has(day) ? ', at Fajr' : ''}`}>
+        <i key={day} className={`${on.has(day) ? 'on' : excused.has(day) ? 'ex' : ''}${day === stats.today ? ' today' : ''}`} style={day > stats.today ? { opacity: 0.35 } : undefined}
+          aria-label={`${day}${on.has(day) ? ', at Fajr' : excused.has(day) ? ', excused' : ''}`}>
           {Number(day.slice(8))}
         </i>
       ))}
@@ -83,7 +85,7 @@ export function MePage() {
           <section className="card">
             <Eyebrow icon={<CalendarDays size={15} />}>Last five weeks</Eyebrow>
             <Calendar stats={stats} />
-            {stats.recent.length > 0 && <p className="muted small" style={{ marginTop: 12 }}>Last at {stats.recent[0].mosque}.</p>}
+            {stats.recent.length > 0 && <p className="muted small" style={{ marginTop: 12 }}>Last at {stats.recent[0].mosque}.{stats.excused.length > 0 ? ' Striped days were excused by your mosque and do not break a streak.' : ''}</p>}
           </section>
 
           <section className="card">
@@ -112,11 +114,12 @@ export function MePage() {
         {family.length ? (
           <div className="list">
             {family.map((f) => (
-              <button className="item" key={f.id} onClick={() => setSheet(f)}>
+              <div className="item" key={f.id}>
                 <span className="avatar"><UserRound size={18} /></span>
                 <span className="grow"><b>{f.name}</b><span className="sub" style={{ display: 'block' }}>{f.grp[0].toUpperCase() + f.grp.slice(1)}</span></span>
-                <span className="sub">Edit</span>
-              </button>
+                <Link className="btn soft sm" to={`/kids/${f.id}`}><Baby size={15} /> Kids' view</Link>
+                <button className="btn ghost sm" onClick={() => setSheet(f)}>Edit</button>
+              </div>
             ))}
           </div>
         ) : (
@@ -124,7 +127,15 @@ export function MePage() {
         )}
       </section>
 
+      <section className="card">
+        <Eyebrow icon={<Send size={15} />}>Bring a friend to Fajr</Eyebrow>
+        <p className="small" style={{ marginBottom: 12 }}>Someone who joins with your link starts at your mosque as your buddy. Bring three who come to Fajr and you earn the Caller to Good badge.</p>
+        <button className="btn block" onClick={() => shareInvite(me.user.inviteCode, toast)}><Send size={17} /> Share my invitation link</button>
+      </section>
+
       <section className="card tight">
+        <LinkRow to="/buddies" icon={<HeartHandshake size={19} />} title="Fajr buddies" sub="See who made it today, and nudge" />
+        <LinkRow to="/review" icon={<CalendarRange size={19} />} title="My year in review" sub="Your dawns, month by month" />
         {me.staff.map((m) => <LinkRow key={m.id} to={`/manage/${m.id}`} icon={<Landmark size={19} />} title={m.name} sub={m.role === 'admin' ? 'You are an admin' : 'You are a volunteer'} />)}
         {me.orgs.map((o) => <LinkRow key={o.id} to={`/org/${o.id}`} icon={<UsersRound size={19} />} title={o.name} sub="Your organisation" />)}
         <LinkRow to="/find" icon={<MapPinned size={19} />} title="Find or change my mosque" sub={stats?.home?.name ?? 'No home mosque yet'} />
@@ -138,6 +149,12 @@ export function MePage() {
       </section>
 
       <section className="card form">
+        <Field label="My weekly goal" hint="For when every day is not possible. It shows on Today.">
+          <select value={self.weeklyGoal} onChange={async (e) => { await api('/me', { method: 'PATCH', body: { weeklyGoal: Number(e.target.value) } }); await reload(); reloadStats(); toast('Goal saved'); }}>
+            <option value={0}>No weekly goal</option>
+            {[1, 2, 3, 4, 5, 6, 7].map((n) => <option key={n} value={n}>{n === 7 ? 'Every dawn' : `${n} ${n === 1 ? 'dawn' : 'dawns'} a week`}</option>)}
+          </select>
+        </Field>
         <Switch label="Dark mode" checked={dark} onChange={setTheme} />
         <Switch label="Hide my name on leaderboards" hint="You and your family appear as “Anonymous striver”." checked={self.anonymous} onChange={setAnonymous} />
       </section>

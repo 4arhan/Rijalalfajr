@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Gift, Pencil, Plus, ScrollText, Trash2, Trophy, Users } from 'lucide-react';
+import { Award, Gift, Pencil, Plus, ScrollText, Trash2, Trophy, Users } from 'lucide-react';
 import { api, DEFAULT_LABELS, GROUPS, type Group, type Labels, type Prize, type Standing } from '../api';
-import { Eyebrow, Field, Loading, Podium, Problem, RankList, Screen, Seg, Switch, useAction, useMe } from '../ui';
+import { Eyebrow, Field, Loading, Podium, Problem, RankList, Screen, Seg, Switch, useAction, useSession } from '../ui';
 import { addDays, niceDate, plural, useLoad } from '../lib/util';
 
 interface ChallengeData {
@@ -14,6 +14,7 @@ interface ChallengeData {
   today: string;
   prizes: Prize[];
   rows: Standing[];
+  hidden?: boolean;
   canEdit: boolean;
 }
 
@@ -22,10 +23,10 @@ const ORDINAL = ['1st', '2nd', '3rd'];
 
 export function ChallengePage() {
   const { id } = useParams();
-  const me = useMe();
+  const { me } = useSession();
   const [grp, setGrp] = useState<Group | 'all'>('all');
   const { data, error, reload } = useLoad(() => api<ChallengeData>(`/challenges/${id}`), [id]);
-  const mine = useMemo(() => new Set(me.strivers.map((s) => s.id)), [me]);
+  const mine = useMemo(() => new Set(me?.strivers.map((s) => s.id) ?? []), [me]);
   // Open on a group that has podium prizes when there are none for everyone.
   useEffect(() => {
     const podium = data?.prizes.filter((p) => p.place !== null) ?? [];
@@ -92,7 +93,28 @@ export function ChallengePage() {
         </section>
       )}
 
-      {ch.status !== 'upcoming' && (
+      {ch.status === 'ended' && !data.hidden && data.rows.length > 0 && (
+        <section className="card">
+          <Eyebrow icon={<Award size={15} />}>Winners</Eyebrow>
+          <div className="list">
+            {GROUPS.filter((g) => data.rows.some((r) => r.grp === g)).map((g) => (
+              <div className="item" key={g}>
+                <span className="grow">
+                  <b>{data.labels[g]}</b>
+                  <span className="sub" style={{ display: 'block' }}>
+                    {data.rows.filter((r) => r.grp === g).slice(0, 3).map((r, i) => `${ORDINAL[i]} ${r.name} (${r.days})`).join(' · ')}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+          {me && <Link className="btn block" style={{ marginTop: 12 }} to={`/challenge/${ch.id}/certificates`}><Award size={18} /> {data.canEdit ? 'Print certificates' : 'My certificate'}</Link>}
+        </section>
+      )}
+
+      {data.hidden && <div className="note">This mosque shows its standings to people who are signed in.</div>}
+
+      {ch.status !== 'upcoming' && !data.hidden && (
         <section className="card">
           <Eyebrow icon={<Users size={15} />}>Standings</Eyebrow>
           {rows.length > 3 ? <RankList rows={rows} mine={mine} from={3} /> : <p className="muted small">{rows.length ? 'Everyone taking part is on the podium so far.' : 'No one has checked in during this challenge yet.'}</p>}

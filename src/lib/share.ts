@@ -84,12 +84,11 @@ export async function drawCard(d: CardData): Promise<Blob> {
   return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the card'))), 'image/png'));
 }
 
-export async function shareCard(d: CardData) {
-  const blob = await drawCard(d);
+async function send(blob: Blob, text: string) {
   const file = new File([blob], 'rijal-al-fajr.png', { type: 'image/png' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], text: `${d.streak} dawns in a row at ${d.mosque}. #RijalAlFajr` });
+      await navigator.share({ files: [file], text });
       return;
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
@@ -100,4 +99,144 @@ export async function shareCard(d: CardData) {
   a.download = file.name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+export async function shareCard(d: CardData) {
+  await send(await drawCard(d), `${d.streak} dawns in a row at ${d.mosque}. #RijalAlFajr`);
+}
+
+const FONT = (w: number, size: number) => `${w} ${size}px "Manrope Variable", system-ui, sans-serif`;
+
+function backdrop(W: number, H: number) {
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const x = c.getContext('2d')!;
+  const bg = x.createLinearGradient(0, 0, W * 0.4, H);
+  bg.addColorStop(0, '#15402f');
+  bg.addColorStop(0.5, '#0b2319');
+  bg.addColorStop(1, '#06130f');
+  x.fillStyle = bg;
+  x.fillRect(0, 0, W, H);
+  const glow = x.createRadialGradient(W * 0.86, 0, 10, W * 0.86, 0, W * 0.9);
+  glow.addColorStop(0, 'rgba(245, 190, 92, 0.42)');
+  glow.addColorStop(1, 'rgba(245, 190, 92, 0)');
+  x.fillStyle = glow;
+  x.fillRect(0, 0, W, H);
+  x.textAlign = 'center';
+  return { c, x };
+}
+
+const toBlob = (c: HTMLCanvasElement) =>
+  new Promise<Blob>((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the image'))), 'image/png'));
+
+/** A square-ish post for the mosque's own page: the week's podium and attendance. */
+export async function sharePoster(d: { mosque: string; place: string; podium: { name: string; days: number }[]; total: number; average: number; best: number }) {
+  await document.fonts.ready;
+  const W = 1080;
+  const H = 1350;
+  const { c, x } = backdrop(W, H);
+  x.fillStyle = '#7beabc';
+  x.font = FONT(700, 34);
+  x.fillText('F A J R   T H I S   W E E K', W / 2, 120);
+  x.fillStyle = '#eef8f2';
+  x.font = FONT(750, 70);
+  wrap(x, d.mosque, W - 160).slice(0, 2).forEach((line, i) => x.fillText(line, W / 2, 220 + i * 78));
+  x.fillStyle = '#b4ccc1';
+  x.font = FONT(600, 36);
+  x.fillText(d.place, W / 2, 330 + (x.measureText(d.mosque).width > W - 160 ? 60 : 0));
+
+  // Podium: second, first, third.
+  const cols = [
+    { i: 1, cx: 250, h: 190, color: '#c9d4d4' },
+    { i: 0, cx: 540, h: 270, color: '#f1c768' },
+    { i: 2, cx: 830, h: 140, color: '#d79a6b' },
+  ];
+  const base = 920;
+  for (const col of cols) {
+    const p = d.podium[col.i];
+    x.fillStyle = 'rgba(168, 240, 207, 0.12)';
+    x.fillRect(col.cx - 125, base - col.h, 250, col.h);
+    x.fillStyle = col.color;
+    x.beginPath();
+    x.arc(col.cx, base - col.h - 150, 54, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = '#1b1405';
+    x.font = FONT(800, 46);
+    x.fillText(String(col.i + 1), col.cx, base - col.h - 134);
+    x.fillStyle = '#eef8f2';
+    x.font = FONT(700, 34);
+    x.fillText(p ? wrap(x, p.name, 250)[0] : 'Open', col.cx, base - col.h - 56);
+    x.fillStyle = '#b4ccc1';
+    x.font = FONT(600, 28);
+    x.fillText(p ? `${p.days} ${p.days === 1 ? 'day' : 'days'}` : '', col.cx, base - col.h - 18);
+  }
+  x.fillStyle = '#a8f0cf';
+  x.fillRect(110, base, W - 220, 8);
+
+  const stats: [string, string][] = [[String(d.total), 'check-ins'], [String(d.average), 'a day on average'], [String(d.best), 'on the best day']];
+  stats.forEach(([n, label], i) => {
+    const cx = 250 + i * 290;
+    x.fillStyle = '#eef8f2';
+    x.font = FONT(300, 92);
+    x.fillText(n, cx, 1090);
+    x.fillStyle = '#b4ccc1';
+    x.font = FONT(600, 28);
+    x.fillText(label, cx, 1136);
+  });
+  x.fillStyle = '#7beabc';
+  x.font = FONT(700, 34);
+  x.fillText('Join us at Fajr.  ' + location.host, W / 2, H - 80);
+  await send(await toBlob(c), `Fajr this week at ${d.mosque}. #RijalAlFajr`);
+}
+
+/** A story-sized summary of someone's year. */
+export async function shareReview(d: { name: string; year: number; total: number; best: number; mosques: number; topMosque: string | null; months: number[] }) {
+  await document.fonts.ready;
+  const W = 1080;
+  const H = 1920;
+  const { c, x } = backdrop(W, H);
+  x.fillStyle = '#7beabc';
+  x.font = FONT(700, 40);
+  x.fillText(`M Y   ${d.year}   A T   F A J R`, W / 2, 230);
+  x.fillStyle = '#eef8f2';
+  x.font = FONT(300, 400);
+  x.fillText(String(d.total), W / 2, 720);
+  x.font = FONT(700, 60);
+  x.fillText(d.total === 1 ? 'dawn at the mosque' : 'dawns at the mosque', W / 2, 830);
+  x.fillStyle = '#b4ccc1';
+  x.font = FONT(600, 46);
+  x.fillText(d.name, W / 2, 920);
+
+  // One bar for each month.
+  const max = Math.max(1, ...d.months);
+  const left = 150;
+  const bw = (W - 2 * left) / 12;
+  d.months.forEach((n, i) => {
+    const h = Math.max(6, (n / max) * 260);
+    x.fillStyle = n ? '#a8f0cf' : 'rgba(168, 240, 207, 0.2)';
+    x.fillRect(left + i * bw + 8, 1300 - h, bw - 16, h);
+    x.fillStyle = '#b4ccc1';
+    x.font = FONT(600, 26);
+    x.fillText('JFMAMJJASOND'[i], left + i * bw + bw / 2, 1344);
+  });
+  const facts: [string, string][] = [[String(d.best), 'best streak'], [String(d.mosques), d.mosques === 1 ? 'mosque' : 'mosques']];
+  facts.forEach(([n, label], i) => {
+    const cx = 330 + i * 420;
+    x.fillStyle = '#eef8f2';
+    x.font = FONT(300, 110);
+    x.fillText(n, cx, 1530);
+    x.fillStyle = '#b4ccc1';
+    x.font = FONT(600, 34);
+    x.fillText(label, cx, 1584);
+  });
+  if (d.topMosque) {
+    x.fillStyle = '#7beabc';
+    x.font = FONT(600, 40);
+    x.fillText(wrap(x, `Mostly at ${d.topMosque}`, W - 200)[0], W / 2, 1700);
+  }
+  x.fillStyle = '#eef8f2';
+  x.font = FONT(700, 38);
+  x.fillText(location.host, W / 2, H - 110);
+  await send(await toBlob(c), `${d.total} dawns at the mosque in ${d.year}. #RijalAlFajr`);
 }

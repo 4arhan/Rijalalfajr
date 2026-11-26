@@ -79,6 +79,16 @@ for (const [mi, m] of MOSQUES.entries()) {
     await db.query(`insert into strivers (id, name, grp, user_id, home_mosque_id, squad_id, card_code) values ($1,'Yusuf Rahman','adults',$2,$3,$4,$5)`, [self, userId, id, squads[0], newId(14)]);
     await db.query(`insert into strivers (id, name, grp, guardian_user_id, home_mosque_id, card_code) values ($1,'Musa Rahman','kids',$2,$3,$4)`, [kid, userId, id, newId(14)]);
     people.push({ id: self, keen: 2 }, { id: kid, keen: 0.86 });
+    // Two buddies, a weekly goal, a class, something on after Fajr and a shared target.
+    await db.query(`update strivers set weekly_goal = 6 where id = $1`, [self]);
+    for (const pal of people.slice(4, 6)) await db.query(`insert into buddies (a, b) values ($1,$2), ($2,$1)`, [self, pal.id]);
+    const classId = newId(10);
+    await db.query(`insert into classes (id, mosque_id, name) values ($1,$2,'Saturday madrasa')`, [classId, id]);
+    await db.query(`update strivers set class_id = $1 where home_mosque_id = $2 and grp = 'kids'`, [classId, id]);
+    await db.query(`insert into events (id, mosque_id, fajr_date, title, detail) values ($1,$2,$3,'Breakfast and football','In the hall after the prayer')`, [newId(), id, addDays(today, 1)]);
+    await db.query(`insert into pledges (id, mosque_id, reward, target, start_date, end_date, sponsor) values ($1,$2,'Breakfast for the whole mosque',900,$3,$4,'Baraka Bakery')`, [
+      newId(), id, addDays(today, -24), addDays(today, 5),
+    ]);
   }
 
   for (let d = DAYS; d >= 1; d--) {
@@ -110,6 +120,16 @@ for (const [mi, m] of MOSQUES.entries()) {
     }
   }
   console.log(`Seeded ${m.name}, ${m.city}`);
+}
+await db.query(`insert into seasons (id, name, start_date, end_date) values ($1,'Winter 40 Days of Fajr',$2,$3)`, [
+  newId(10), addDays(localDate(now, 'UTC'), -12), addDays(localDate(now, 'UTC'), 27),
+]);
+// A challenge that ended last week, so there are winners and certificates to see.
+{
+  const done = newId(10);
+  const t = localDate(now, 'Europe/London');
+  await db.query(`insert into challenges (id, scope_type, scope_id, name, start_date, end_date) values ($1,'mosque',$2,'Autumn Fortnight',$3,$4)`, [done, homeId, addDays(t, -20), addDays(t, -7)]);
+  await db.query(`insert into prizes (id, challenge_id, grp, place, title) values ($1,$2,'kids',1,'Football kit')`, [newId(), done]);
 }
 await db.query(
   `insert into challenges (id, scope_type, scope_id, name, start_date, end_date) values ($1,'org',$2,'Winter Fajr League',$3,$4)`,

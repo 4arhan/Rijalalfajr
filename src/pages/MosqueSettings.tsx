@@ -33,6 +33,7 @@ export function MosqueSettings() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     calcMethod: 'MuslimWorldLeague', openBeforeMin: 30, iqamahAfterMin: 20, closeAfterSunriseMin: 0, radiusM: 200, dailyGoal: 0, practice: false,
     labels: DEFAULT_LABELS as Labels,
+    fajrTime: null as string | null, iqamahTime: null as string | null, publicBoard: true,
   });
   const [org, setOrg] = useState<{ id: string; name: string } | null>(null);
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -67,6 +68,7 @@ export function MosqueSettings() {
         nav(`/manage/${id}`);
       } else {
         const r = await api<{ id: string }>('/mosques', { body });
+        await api(`/mosques/${r.id}`, { method: 'PATCH', body: { fajrTime: f.fajrTime, iqamahTime: f.iqamahTime, publicBoard: f.publicBoard } });
         await reloadMe();
         nav(`/manage/${r.id}`, { replace: true });
       }
@@ -114,9 +116,17 @@ export function MosqueSettings() {
           <Field label="Opens, minutes before the adhan"><input {...num('openBeforeMin')} min={0} max={120} /></Field>
           <Field label="Iqamah, minutes after the adhan"><input {...num('iqamahAfterMin')} min={0} max={90} /></Field>
         </div>
+        <div className="grid2">
+          <Field label="Your own Fajr time" hint="Leave empty to use the calculated time."><input type="time" value={f.fajrTime ?? ''} onChange={(e) => set('fajrTime', e.target.value || null)} /></Field>
+          <Field label="Your own iqamah time" hint="From your timetable. Update it when it changes."><input type="time" value={f.iqamahTime ?? ''} onChange={(e) => set('iqamahTime', e.target.value || null)} /></Field>
+        </div>
         <Field label="Closes, minutes after sunrise" hint="0 closes check-in at sunrise. Use a negative number to close earlier."><input {...num('closeAfterSunriseMin')} min={-60} max={120} /></Field>
         <Field label="Daily goal" hint="How many people you hope to see at Fajr. 0 hides the goal."><input {...num('dailyGoal')} min={0} /></Field>
         <Switch label="Practice mode" hint="Check-in works at any time and from anywhere, so you can try it. The mosque stays off the world leaderboard while this is on." checked={f.practice} onChange={(v) => set('practice', v)} />
+      </section>
+
+      <section className="card form">
+        <Switch label="Public leaderboard" hint="Anyone with the link can see the podium without an account, with names shown as a first name and an initial. Turn off to show names only to people who are signed in." checked={f.publicBoard} onChange={(v) => set('publicBoard', v)} />
       </section>
 
       <section className="card form">

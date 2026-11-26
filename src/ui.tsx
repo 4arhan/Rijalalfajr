@@ -30,11 +30,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      setMe(await api<Me>('/me'));
+      const fresh = await api<Me>('/me');
+      localStorage.setItem('raf.me', JSON.stringify(fresh));
+      setMe(fresh);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         setToken(null);
         setMe(null);
+      } else if (e instanceof ApiError && e.code === 'offline') {
+        // No signal: carry on as the account that was last signed in on this phone.
+        try {
+          setMe(JSON.parse(localStorage.getItem('raf.me') ?? 'null'));
+        } catch {
+          /* nothing saved */
+        }
       }
     }
     setReady(true);
@@ -51,6 +60,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
   const signOut = useCallback(() => {
     api('/auth/logout', { method: 'POST' }).catch(() => {});
+    localStorage.removeItem('raf.me');
     setToken(null);
     setMe(null);
   }, []);
