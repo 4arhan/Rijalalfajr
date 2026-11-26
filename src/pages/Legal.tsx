@@ -1,0 +1,41 @@
+import { Screen, useSession } from '../ui';
+
+export function RulesPage() {
+  const { me } = useSession();
+  return (
+    <Screen title="Rules and fair play" back={me ? true : '/'}>
+      <section className="card form">
+        <h3>How check-in works</h3>
+        <p className="small">You check in once per Fajr, at a registered mosque, between shortly before the adhan and sunrise. You scan the code on the mosque's screen, or the printed poster while your phone is at the mosque, or a volunteer marks you on the attendance list.</p>
+        <h3>How ranking works</h3>
+        <p className="small">People are ranked by the number of days they attended Fajr. Ties are broken by the longest streak, then by who arrives earliest on average. A mosque's place on the world leaderboard comes from the Fajr prayers prayed inside it.</p>
+        <h3>Fair play</h3>
+        <p className="small">Check in only when you are at the mosque for Fajr, and only for yourself and your own family. Mosque admins can remove a check-in that was made by mistake or dishonestly, and the app owner can suspend a mosque that abuses the leaderboard.</p>
+        <h3>Prizes</h3>
+        <p className="small">Any prize is offered, funded and handed out by the mosque or organisation that announced it. Rijal al-Fajr only shows the prize and the standings. There is nothing to buy and no entry fee. Apple and Google are not sponsors and are not involved in any way.</p>
+        <h3>Intention</h3>
+        <p className="small">The leaderboard is encouragement, not the goal. If seeing your name on it does not help your intention, you can hide your name in Me.</p>
+      </section>
+    </Screen>
+  );
+}
+
+export function PrivacyPage() {
+  const { me } = useSession();
+  return (
+    <Screen title="Privacy" back={me ? true : '/'}>
+      <section className="card form">
+        <h3>What we store</h3>
+        <p className="small">Your email, a scrambled form of your password, your display name and group, your home mosque, and the date, time and mosque of each check-in. For children we store only a display name and group. They have no account, no email and no password.</p>
+        <h3>Location</h3>
+        <p className="small">When you check in from a printed poster we ask for your location once, to confirm you are at the mosque. We keep the distance in metres with the check-in. We do not keep where you were and we never track you.</p>
+        <h3>Who sees what</h3>
+        <p className="small">People at your mosque see your display name, days attended and streak on the leaderboard. You can hide your name. Mosque staff see who checked in at their mosque. Other mosques and the world leaderboard see only totals.</p>
+        <h3>What we do not do</h3>
+        <p className="small">No ads. No selling or sharing of your data. No tracking across other apps or sites.</p>
+        <h3>Deleting your data</h3>
+        <p className="small">Delete your account in Me. That removes your account, your family members and every check-in of yours, straight away and for good.</p>
+      </section>
+    </Screen>
+  );
+}

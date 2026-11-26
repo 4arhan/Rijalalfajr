@@ -1,0 +1,214 @@
+// Database access. Production uses Postgres through DATABASE_URL; without it the
+// app runs on PGlite (Postgres compiled to WASM) so development and tests need
+// no database server.
+
+export interface Db {
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+  exec(sql: string): Promise<void>;
+  close(): Promise<void>;
+}
+
+const SCHEMA_VERSION = 1;
+
+const SCHEMA = `
+create table if not exists meta (key text primary key, value text not null);
+
+create table if not exists users (
+  id text primary key,
+  email text unique not null,
+  pass_hash text not null,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists sessions (
+  token_hash text primary key,
+  user_id text not null references users(id) on delete cascade,
+  expires_at timestamptz not null
+);
+
+create table if not exists orgs (
+  id text primary key,
+  name text not null,
+  code text unique not null,
+  owner_user_id text references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists mosques (
+  id text primary key,
+  name text not null,
+  city text not null default '',
+  country text not null default '',
+  lat double precision not null,
+  lng double precision not null,
+  timezone text not null,
+  calc_method text not null default 'MuslimWorldLeague',
+  open_before_min int not null default 30,
+  iqamah_after_min int not null default 20,
+  close_after_sunrise_min int not null default 0,
+  radius_m int not null default 200,
+  daily_goal int not null default 0,
+  practice boolean not null default false,
+  verified boolean not null default false,
+  suspended boolean not null default false,
+  qr_secret text not null,
+  static_key text not null,
+  org_id text references orgs(id) on delete set null,
+  labels jsonb not null default '{}',
+  created_by text references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists mosque_staff (
+  mosque_id text not null references mosques(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  role text not null check (role in ('admin','volunteer')),
+  primary key (mosque_id, user_id)
+);
+
+create table if not exists squads (
+  id text primary key,
+  mosque_id text not null references mosques(id) on delete cascade,
+  name text not null,
+  code text unique not null,
+  created_at timestamptz not null default now()
+);
+
+-- A striver is anyone who attends: an account holder, a child on a parent's
+-- account, or a name on a mosque's attendance list with no account at all.
+create table if not exists strivers (
+  id text primary key,
+  name text not null,
+  grp text not null check (grp in ('kids','youth','adults')),
+  user_id text unique references users(id) on delete cascade,
+  guardian_user_id text references users(id) on delete cascade,
+  managed_mosque_id text references mosques(id) on delete cascade,
+  home_mosque_id text references mosques(id) on delete set null,
+  squad_id text references squads(id) on delete set null,
+  anonymous boolean not null default false,
+  card_code text unique not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists strivers_home on strivers(home_mosque_id);
+create index if not exists strivers_guardian on strivers(guardian_user_id);
+
+create table if not exists checkins (
+  id text primary key,
+  striver_id text not null references strivers(id) on delete cascade,
+  mosque_id text not null references mosques(id) on delete cascade,
+  fajr_date text not null,
+  at timestamptz not null default now(),
+  method text not null check (method in ('qr','poster','list','card')),
+  by_user_id text references users(id) on delete set null,
+  offset_sec int not null default 0,
+  distance_m int,
+  device text,
+  unique (striver_id, fajr_date)
+);
+create index if not exists checkins_mosque_date on checkins(mosque_id, fajr_date);
+create index if not exists checkins_date on checkins(fajr_date);
+
+create table if not exists challenges (
+  id text primary key,
+  scope_type text not null check (scope_type in ('mosque','org')),
+  scope_id text not null,
+  name text not null,
+  start_date text not null,
+  end_date text not null,
+  count_away boolean not null default true,
+  rules text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists challenges_scope on challenges(scope_type, scope_id);
+
+create table if not exists prizes (
+  id text primary key,
+  challenge_id text not null references challenges(id) on delete cascade,
+  grp text not null check (grp in ('all','kids','youth','adults')),
+  place int,
+  milestone_days int,
+  title text not null,
+  detail text not null default '',
+  sponsor text not null default ''
+);
+
+create table if not exists reports (
+  id text primary key,
+  reporter_user_id text references users(id) on delete set null,
+  target_type text not null,
+  target_id text not null,
+  reason text not null,
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+`;
+
+async function migrate(db: Db) {
+  const [reg] = await db.query<{ t: string | null }>(`select to_regclass('public.meta')::text as t`);
+  if (reg?.t) {
+    const [v] = await db.query<{ value: string }>(`select value from meta where key = 'schema'`);
+    if (v && Number(v.value) >= SCHEMA_VERSION) return;
+  }
+  await db.exec(SCHEMA);
+  await db.query(
+    `insert into meta (key, value) values ('schema', $1) on conflict (key) do update set value = excluded.value`,
+    [String(SCHEMA_VERSION)],
+  );
+}
+
+async function openPg(url: string): Promise<Db> {
+  const { default: pg } = await import('pg');
+  const local = /localhost|127\.0\.0\.1/.test(url);
+  const pool = new pg.Pool({
+    connectionString: url,
+    max: 3,
+    ssl: local || /sslmode=disable/.test(url) ? undefined : { rejectUnauthorized: true },
+  });
+  return {
+    async query(sql, params) {
+      const r = await pool.query(sql, params as unknown[]);
+      return r.rows;
+    },
+    async exec(sql) {
+      await pool.query(sql);
+    },
+    close: () => pool.end(),
+  };
+}
+
+async function openLite(dir?: string): Promise<Db> {
+  const { PGlite } = await import('@electric-sql/pglite');
+  if (dir) (await import('node:fs')).mkdirSync(dir, { recursive: true });
+  const lite = dir ? new PGlite(dir) : new PGlite();
+  await lite.waitReady;
+  return {
+    async query(sql, params) {
+      const r = await lite.query(sql, params as unknown[]);
+      return r.rows as never;
+    },
+    async exec(sql) {
+      await lite.exec(sql);
+    },
+    close: () => lite.close(),
+  };
+}
+
+export async function openDb(opts: { url?: string; memory?: boolean } = {}): Promise<Db> {
+  const url = opts.url ?? process.env.DATABASE_URL;
+  let db: Db;
+  if (url && !opts.memory) db = await openPg(url);
+  else db = await openLite(opts.memory ? undefined : process.env.PGLITE_DIR || '.data/pglite');
+  await migrate(db);
+  return db;
+}
+
+let shared: Promise<Db> | undefined;
+/** One connection per server instance. */
+export function getDb(): Promise<Db> {
+  shared ??= openDb().catch((e) => {
+    shared = undefined;
+    throw e;
+  });
+  return shared;
+}

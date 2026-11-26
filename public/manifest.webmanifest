@@ -1,0 +1,10 @@
+{
+  "name": "Rijal al-Fajr",
+  "short_name": "Rijal al-Fajr",
+  "description": "Check in for Fajr at your mosque, keep your streak and compete with mosques around the world.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f5f2",
+  "theme_color": "#0b2319",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
