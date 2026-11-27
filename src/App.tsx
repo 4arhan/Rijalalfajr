@@ -86,11 +86,9 @@ export function App() {
   const open = /^\/(c\/|privacy|rules|world|m\/|org\/|class\/|challenge\/[^/]+$)/.test(path) && path !== '/challenge/new';
   if (!me && !open) {
     return (
-      <div className="shell bare">
-        <Routes>
-          <Route path="*" element={<AuthPage />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="*" element={<AuthPage />} />
+      </Routes>
     );
   }
   const bare = /^\/(c\/|manage\/[^/]+\/screen)/.test(path) || !me;
