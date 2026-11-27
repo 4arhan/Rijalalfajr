@@ -18,6 +18,7 @@ import { PrivacyPage, RulesPage } from './pages/Legal';
 import { MosqueSponsors, SponsorPage } from './pages/Sponsor';
 import { BuddiesPage, KidsPage, ReviewPage } from './pages/Personal';
 import { CertificatesPage, ClassPage, ClassesPage, EmbedPage } from './pages/Community';
+import { ImportPage, MissingPage, WishesPage } from './pages/Staff';
 import { t } from './lib/i18n';
 
 function Nav() {
@@ -123,6 +124,9 @@ export function App() {
         <Route path="/manage/:id/print" element={<PrintPage />} />
         <Route path="/manage/:id/classes" element={<ClassesPage />} />
         <Route path="/manage/:id/sponsors" element={<MosqueSponsors />} />
+        <Route path="/manage/:id/missing" element={<MissingPage />} />
+        <Route path="/manage/:id/wishes" element={<WishesPage />} />
+        <Route path="/manage/:id/import" element={<ImportPage />} />
         <Route path="/sponsor" element={<SponsorPage />} />
         <Route path="/owner" element={<OwnerPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />

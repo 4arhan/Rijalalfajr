@@ -1,20 +1,20 @@
 // Buddies, the year in review and the kids' view.
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BellRing, Check, HeartHandshake, IdCard, Share2, Star, Trash2, UserPlus } from 'lucide-react';
-import { api, type Stats } from '../api';
-import { Eyebrow, Field, Loading, Problem, Qr, Screen, Sheet, useAction, useMe, useToast } from '../ui';
-import { addDays, plural, useLoad } from '../lib/util';
+import { Activity, BellRing, Check, HeartHandshake, IdCard, Share2, Star, Sun, Trash2, UserPlus } from 'lucide-react';
+import { api, type ExcuseRequest, type Patterns, type Stats, type Striver } from '../api';
+import { Avatar, Eyebrow, Field, Loading, Problem, Qr, Screen, Sheet, Skeleton, useAction, useMe, useToast } from '../ui';
+import { addDays, niceDate, plural, useLoad } from '../lib/util';
 import { shareReview } from '../lib/share';
 import { dateLocale, t, tn, tx } from '../lib/i18n';
 
-export interface Buddy { striverId: string; name: string; mosque: string | null; doneToday: boolean; streak: number; nudged: boolean }
+export interface Buddy { striverId: string; name: string; mosque: string | null; doneToday: boolean; streak: number; nudged: boolean; awake: boolean }
 export interface BuddyData { buddies: Buddy[]; nudges: { id: string; name: string }[] }
 
 /** Share your invitation link through the phone's share sheet, or copy it. */
 export async function shareInvite(code: string, toast: (m: string) => void) {
   const url = `${location.origin}/i/${code}`;
-  const text = 'Join me for Fajr at the mosque. We keep each other going on Rijal al-Fajr.';
+  const text = t('Join me for Fajr at the mosque. We keep each other going on Rijal al-Fajr.');
   try {
     if (navigator.share) await navigator.share({ text, url });
     else {
@@ -72,6 +72,7 @@ export function BuddiesPage() {
                   <b>{b.name}</b>
                   <span className="sub" style={{ display: 'block' }}>{`${b.doneToday ? t('At Fajr today') : t('Not checked in yet')} · ${tn(b.streak, '{n} day in a row', '{n} days in a row')}`}</span>
                 </span>
+                {b.awake && !b.doneToday && <span className="pill gold"><Sun size={13} /> {t('Awake')}</span>}
                 {!b.doneToday && (
                   <button className="btn soft sm" disabled={act.busy || b.nudged} onClick={() => nudge(b)}><BellRing size={15} /> {b.nudged ? t('Nudged') : t('Nudge')}</button>
                 )}
@@ -189,5 +190,136 @@ export function KidsPage() {
         </Sheet>
       )}
     </Screen>
+  );
+}
+
+// ---------- my patterns ----------
+
+const weekday = (i: number, width: 'long' | 'narrow') => new Intl.DateTimeFormat(dateLocale(), { weekday: width, timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 1 + i)));
+
+/** Which weekday a person misses most, and whether they arrive earlier than they did. Only they see it. */
+export function PatternsCard({ patterns }: { patterns: Patterns | null }) {
+  const p = patterns;
+  const arrival = p?.arrival;
+  const diff = arrival && arrival.before !== null ? arrival.before - arrival.now : 0;
+  return (
+    <section className="card">
+      <Eyebrow icon={<Activity size={15} />}>{t('My patterns')}</Eyebrow>
+      {!p ? (
+        <p className="muted small">{t('Your patterns appear after two weeks of Fajr at the mosque: the weekday you miss most, and whether you are arriving earlier.')}</p>
+      ) : (
+        <>
+          <div className="wk-bars" role="img" aria-label={t('How often you came on each day of the week')}>
+            {p.weekdays.map((w, i) => (
+              <div key={i} className={i === p.hardest ? 'low' : i === p.strongest ? 'high' : ''} title={`${weekday(i, 'long')}: ${w.came}/${w.of}`}>
+                <i style={{ height: `${w.of ? Math.max(6, (w.came / w.of) * 100) : 6}%` }} />
+                <span>{weekday(i, 'narrow')}</span>
+              </div>
+            ))}
+          </div>
+          <p className="small" style={{ marginTop: 12 }}>
+            {p.hardest !== null && p.strongest !== null ? (
+              <>
+                {tx('<b>{day}</b> is your hardest day: {came} of the last {of}.', { day: weekday(p.hardest, 'long'), came: p.weekdays[p.hardest].came, of: p.weekdays[p.hardest].of })}{' '}
+                {tx('<b>{day}</b> is your strongest.', { day: weekday(p.strongest, 'long') })}
+              </>
+            ) : (
+              t('No weekday stands out. You are about as steady on one day as on another.')
+            )}
+          </p>
+          {arrival && (
+            <p className="small" style={{ marginTop: 8 }}>
+              {arrival.now === 0
+                ? t('On average you arrive right at the adhan.')
+                : arrival.now < 0
+                  ? tn(-arrival.now, 'On average you arrive {n} minute before the adhan.', 'On average you arrive {n} minutes before the adhan.')
+                  : tn(arrival.now, 'On average you arrive {n} minute after the adhan.', 'On average you arrive {n} minutes after the adhan.')}{' '}
+              {arrival.before === null
+                ? ''
+                : diff >= 1
+                  ? tn(diff, 'That is {n} minute earlier than the month before.', 'That is {n} minutes earlier than the month before.')
+                  : diff <= -1
+                    ? tn(-diff, 'That is {n} minute later than the month before.', 'That is {n} minutes later than the month before.')
+                    : t('That is the same as the month before.')}
+            </p>
+          )}
+          <p className="muted small" style={{ marginTop: 10 }}>{t('From your last twelve weeks. Only you see this.')}</p>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ---------- asking to be excused ----------
+
+const REASONS: [string, string][] = [['illness', t('Illness')], ['travel', t('Travel')], ['other', t('Something else')]];
+
+export function ExcuseSheet({ people, today, onClose }: { people: Striver[]; today: string; onClose: () => void }) {
+  const toast = useToast();
+  const act = useAction();
+  const able = people.filter((s) => s.homeMosqueId);
+  const [who, setWho] = useState(able[0]?.id ?? '');
+  const [fromDate, setFrom] = useState(addDays(today, 1));
+  const [toDate, setTo] = useState(addDays(today, 1));
+  const [why, setWhy] = useState('illness');
+  const [note, setNote] = useState('');
+  const mine = useLoad(() => api<{ requests: ExcuseRequest[] }>('/excuse-requests'), []);
+  const send = () =>
+    act.run(async () => {
+      const label = REASONS.find((r) => r[0] === why)![1];
+      await api('/excuse-requests', { body: { striverId: who, fromDate, toDate: toDate < fromDate ? fromDate : toDate, reason: [why === 'other' ? '' : label, note.trim()].filter(Boolean).join(': ') } });
+      toast(t('Sent. Your mosque will answer.'));
+      setNote('');
+      mine.reload();
+    });
+  const STATUS: Record<ExcuseRequest['status'], [string, string]> = { pending: [t('Waiting'), ' grey'], approved: [t('Approved'), ''], declined: [t('Declined'), ' grey'] };
+  return (
+    <Sheet title={t('Ask to be excused')} onClose={onClose}>
+      <div className="form">
+        <p className="muted small">{t('Ill, or travelling where there is no registered mosque? Ask your mosque to excuse the days. If it agrees, your streak carries on.')}</p>
+        {!able.length ? (
+          <div className="note">{t('Choose your home mosque first.')}</div>
+        ) : (
+          <>
+            {able.length > 1 && (
+              <Field label={t('Who is it for?')}>
+                <select value={who} onChange={(e) => setWho(e.target.value)}>{able.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              </Field>
+            )}
+            <div className="grid2">
+              <Field label={t('From')}><input type="date" value={fromDate} min={addDays(today, -7)} max={addDays(today, 14)} onChange={(e) => { setFrom(e.target.value); if (toDate < e.target.value) setTo(e.target.value); }} /></Field>
+              <Field label={t('To')}><input type="date" value={toDate} min={fromDate} max={addDays(today, 14)} onChange={(e) => setTo(e.target.value)} /></Field>
+            </div>
+            <Field label={t('Reason')}>
+              <select value={why} onChange={(e) => setWhy(e.target.value)}>{REASONS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}</select>
+            </Field>
+            <Field label={t('A note (optional)')}><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={150} /></Field>
+            {act.error && <div className="note err" role="alert">{act.error}</div>}
+            <button className="btn block" disabled={act.busy || !who} onClick={send}>{t('Send to my mosque')}</button>
+          </>
+        )}
+        {mine.data && mine.data.requests.length > 0 && (
+          <div>
+            <Eyebrow>{t('My requests')}</Eyebrow>
+            <div className="list">
+              {mine.data.requests.map((r) => (
+                <div className="item" key={r.id}>
+                  <Avatar name={r.name} />
+                  <span className="grow">
+                    <b className="truncate" style={{ display: 'block' }}>{r.fromDate === r.toDate ? niceDate(r.fromDate) : t('{from} to {to}', { from: niceDate(r.fromDate), to: niceDate(r.toDate) })}</b>
+                    <span className="sub">{[people.length > 1 ? r.name.split(' ')[0] : '', r.reason].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className={`pill${STATUS[r.status][1]}`}>{STATUS[r.status][0]}</span>
+                  {r.status === 'pending' && (
+                    <button className="iconbtn" aria-label={t('Withdraw this request')} onClick={async () => { await api(`/excuse-requests/${r.id}`, { method: 'DELETE' }); mine.reload(); }}><Trash2 size={16} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!mine.data && !mine.error && <Skeleton hero={false} cards={1} />}
+      </div>
+    </Sheet>
   );
 }

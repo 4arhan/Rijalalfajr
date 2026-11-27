@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Award, Baby, Building2, CalendarRange, HandHeart, HeartHandshake, Send, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck, Sparkles, Star,
-  Sun, Sunrise, Trash2, Trophy, UserRound, Users, UsersRound,
+  Award, Baby, Building2, CalendarOff, CalendarRange, HandHeart, HeartHandshake, Megaphone, Send, CalendarDays, Crown, Flame, Footprints, Landmark, LogOut, MapPinned, Medal, Moon, Plus, Share2, ShieldCheck,
+  Smartphone, Sparkles, Star, Sun, Sunrise, Trash2, Trophy, Users, UsersRound,
 } from 'lucide-react';
 import { api, GROUPS, type Group, type Stats, type Striver } from '../api';
-import { Eyebrow, Field, LinkRow, Loading, Problem, Screen, Sheet, Switch, useAction, useMe, useSession, useToast } from '../ui';
+import { Avatar, CountUp, Eyebrow, Field, LinkRow, Problem, Screen, Sheet, Skeleton, Switch, useAction, useMe, useSession, useToast } from '../ui';
 import { addDays, plural, useLoad, groupName } from '../lib/util';
-import { shareInvite } from './Personal';
+import { ExcuseSheet, PatternsCard, shareInvite } from './Personal';
+import { InstallSheet, isInstalled } from './Social';
 import { shareCard } from '../lib/share';
 import { LanguagePicker, dateLocale, t, tn } from '../lib/i18n';
 
 const BADGE_ICON: Record<string, React.ReactNode> = {
   first: <Sunrise size={24} />, three: <Footprints size={24} />, week: <Flame size={24} />, fortnight: <Star size={24} />, steadfast: <Medal size={24} />,
-  rijal: <Crown size={24} />, hundred: <Trophy size={24} />, musafir: <MapPinned size={24} />, early: <Sparkles size={24} />,
+  rijal: <Crown size={24} />, hundred: <Trophy size={24} />, musafir: <MapPinned size={24} />, early: <Sparkles size={24} />, caller: <Megaphone size={24} />,
 };
 
 function Calendar({ stats }: { stats: Stats }) {
@@ -46,7 +47,8 @@ export function MePage() {
   const self = me.strivers.find((s) => s.self)!;
   const family = me.strivers.filter((s) => !s.self);
   const [who, setWho] = useState(self.id);
-  const [sheet, setSheet] = useState<null | 'family' | 'org' | 'delete' | Striver>(null);
+  const [sheet, setSheet] = useState<null | 'family' | 'org' | 'delete' | 'excuse' | 'install' | Striver>(null);
+  const [familyName, setFamilyName] = useState(me.user.familyName ?? '');
   const [dark, setDark] = useState(document.documentElement.dataset.theme === 'dark');
   const { data: stats, error, reload: reloadStats } = useLoad(() => api<Stats>(`/strivers/${who}/stats`), [who]);
 
@@ -72,11 +74,11 @@ export function MePage() {
           ))}
         </div>
       )}
-      {error ? <Problem error={error} retry={reloadStats} /> : !stats ? <Loading /> : (
+      {error ? <Problem error={error} retry={reloadStats} /> : !stats ? <Skeleton /> : (
         <>
           <section className="hero">
             <Eyebrow icon={<Sunrise size={15} />}>{stats.striver.name}</Eyebrow>
-            <div className="big num" style={{ marginTop: 12 }}>{stats.total}<small>{stats.total === 1 ? t('Fajr at the mosque') : t('Fajr prayers at the mosque')}</small></div>
+            <div className="big num" style={{ marginTop: 12 }}><CountUp value={stats.total} /><small>{stats.total === 1 ? t('Fajr at the mosque') : t('Fajr prayers at the mosque')}</small></div>
             <div className="stats">
               <div><label>{t('Streak now')}</label><b className="num">{stats.streak}</b></div>
               <div><label>{t('Best streak')}</label><b className="num">{stats.best}</b></div>
@@ -89,6 +91,8 @@ export function MePage() {
             <Calendar stats={stats} />
             {stats.recent.length > 0 && <p className="muted small" style={{ marginTop: 12 }}>{[t('Last at {mosque}.', { mosque: stats.recent[0].mosque }), stats.excused.length > 0 && t('Striped days were excused by your mosque and do not break a streak.')].filter(Boolean).join(' ')}</p>}
           </section>
+
+          <PatternsCard patterns={stats.patterns} />
 
           <section className="card">
             <div className="between" style={{ marginBottom: 12 }}>
@@ -117,7 +121,7 @@ export function MePage() {
           <div className="list">
             {family.map((f) => (
               <div className="item" key={f.id}>
-                <span className="avatar"><UserRound size={18} /></span>
+                <Avatar name={f.name} />
                 <span className="grow"><b>{f.name}</b><span className="sub" style={{ display: 'block' }}>{groupName(f.grp)}</span></span>
                 <Link className="btn soft sm" to={`/kids/${f.id}`}><Baby size={15} />{' '}{t('Kids\' view')}</Link>
                 <button className="btn ghost sm" onClick={() => setSheet(f)}>{t('Edit')}</button>
@@ -126,6 +130,18 @@ export function MePage() {
           </div>
         ) : (
           <p className="muted small">{t('Add your children and check them in with your own scan. They need no phone and no account.')}</p>
+        )}
+        {family.length > 0 && (
+          <div className="row" style={{ marginTop: 12, alignItems: 'flex-end' }}>
+            <span className="grow">
+              <Field label={t('Family name (optional)')} hint={t('Shown on your mosque’s family table. Left empty, it reads “Family of {name}”.', { name: self.name.split(' ')[0] })}>
+                <input value={familyName} onChange={(e) => setFamilyName(e.target.value)} maxLength={40} placeholder={t('e.g. The Rahman family')} />
+              </Field>
+            </span>
+            {familyName.trim() !== (me.user.familyName ?? '') && (
+              <button className="btn sm" style={{ marginBottom: 24 }} onClick={async () => { await api('/me', { method: 'PATCH', body: { familyName: familyName.trim() || null } }); await reload(); toast(t('Saved')); }}>{t('Save')}</button>
+            )}
+          </div>
         )}
       </section>
 
@@ -138,6 +154,10 @@ export function MePage() {
       <section className="card tight">
         <LinkRow to="/buddies" icon={<HeartHandshake size={19} />} title={t('Fajr buddies')} sub={t('See who made it today, and nudge')} />
         <LinkRow to="/review" icon={<CalendarRange size={19} />} title={t('My year in review')} sub={t('Your dawns, month by month')} />
+        <button className="item" onClick={() => setSheet('excuse')}>
+          <span className="icon"><CalendarOff size={19} /></span>
+          <span className="grow"><b>{t('Ask to be excused')}</b><span className="sub" style={{ display: 'block' }}>{t('Ill or travelling? Ask your mosque to keep your streak')}</span></span>
+        </button>
         {me.staff.map((m) => <LinkRow key={m.id} to={`/manage/${m.id}`} icon={<Landmark size={19} />} title={m.name} sub={m.role === 'admin' ? t('You are an admin') : t('You are a volunteer')} />)}
         {me.orgs.map((o) => <LinkRow key={o.id} to={`/org/${o.id}`} icon={<UsersRound size={19} />} title={o.name} sub={t('Your organisation')} />)}
         <LinkRow to="/find" icon={<MapPinned size={19} />} title={t('Find or change my mosque')} sub={stats?.home?.name ?? t('No home mosque yet')} />
@@ -165,6 +185,12 @@ export function MePage() {
       <section className="card tight">
         <LinkRow to="/rules" icon={<Trophy size={19} />} title={t('Rules and fair play')} />
         <LinkRow to="/privacy" icon={<ShieldCheck size={19} />} title={t('Privacy')} sub={me.user.email} />
+        {!isInstalled() && (
+          <button className="item" onClick={() => setSheet('install')}>
+            <span className="icon"><Smartphone size={19} /></span>
+            <span className="grow"><b>{t('Add to your home screen')}</b><span className="sub" style={{ display: 'block' }}>{t('How to do it on iPhone and Android')}</span></span>
+          </button>
+        )}
         <a className="item" href="/about/"><span className="icon">{dark ? <Moon size={19} /> : <Sun size={19} />}</span><span className="grow"><b>{t('About Rijal al-Fajr')}</b></span></a>
         <button className="item" onClick={() => { signOut(); nav('/'); }}><span className="icon"><LogOut size={19} /></span><span className="grow"><b>{t('Sign out')}</b></span></button>
         <button className="item" onClick={() => setSheet('delete')} style={{ color: 'var(--danger)' }}>
@@ -176,6 +202,8 @@ export function MePage() {
       {(sheet === 'family' || (sheet && typeof sheet === 'object')) && (
         <FamilySheet member={typeof sheet === 'object' ? sheet : null} onClose={() => setSheet(null)} onSaved={async () => { await reload(); setWho(self.id); setSheet(null); }} />
       )}
+      {sheet === 'excuse' && <ExcuseSheet people={me.strivers} today={stats?.today ?? new Date().toISOString().slice(0, 10)} onClose={() => setSheet(null)} />}
+      {sheet === 'install' && <InstallSheet onClose={() => setSheet(null)} />}
       {sheet === 'org' && <OrgSheet onClose={() => setSheet(null)} onMade={async (id) => { await reload(); nav(`/org/${id}`); }} />}
       {sheet === 'delete' && <DeleteSheet onClose={() => setSheet(null)} onDone={() => { signOut(); nav('/'); }} />}
       <p className="muted small" style={{ textAlign: 'center' }}>{tn(me.strivers.length, 'Free, with no ads. {n} person on this account.', 'Free, with no ads. {n} people on this account.')}</p>

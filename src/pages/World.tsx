@@ -1,15 +1,22 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarRange, Globe, Search } from 'lucide-react';
+import { Award, CalendarRange, Globe, Search, Sprout, TrendingUp } from 'lucide-react';
 import { api } from '../api';
-import { Eyebrow, Loading, Problem, Screen, Seg, useSession } from '../ui';
+import { Empty, Eyebrow, Problem, Screen, Seg, Skeleton, useSession } from '../ui';
 import { niceDate, plural, useLoad } from '../lib/util';
-import { t } from '../lib/i18n';
+import { t, tn } from '../lib/i18n';
 
 interface Row { id: string; name: string; city: string; country: string; total: number; strivers: number; consistency: number | null }
 interface GroupRow { name: string; country: string; total: number; mosques: number }
 interface Season { id: string; name: string; startDate: string; endDate: string; status: 'upcoming' | 'active' | 'ended' }
-interface WorldData { rows: Row[]; groups: GroupRow[]; countries: string[]; seasons: Season[] }
+interface MosqueAward { kind: 'consistent' | 'improved' | 'newcomer'; id: string; name: string; city: string; country: string; value: number }
+interface WorldData { rows: Row[]; groups: GroupRow[]; countries: string[]; seasons: Season[]; awards?: MosqueAward[]; week?: { from: string; to: string } }
+
+const AWARD: Record<MosqueAward['kind'], { icon: React.ReactNode; label: () => string; detail: (v: number) => string }> = {
+  consistent: { icon: <Award size={20} />, label: () => t('Most consistent'), detail: (v) => t('{value}% of its strivers each day', { value: v }) },
+  improved: { icon: <TrendingUp size={20} />, label: () => t('Most improved'), detail: (v) => t('{value}% more check-ins than the week before', { value: v }) },
+  newcomer: { icon: <Sprout size={20} />, label: () => t('Best newcomer'), detail: (v) => tn(v, '{n} check-in in its first weeks', '{n} check-ins in its first weeks') },
+};
 
 type View = 'mosque' | 'city' | 'country';
 
@@ -59,6 +66,25 @@ export function WorldPage() {
         </section>
       )}
 
+      {data && !!data.awards?.length && data.week && (
+        <section className="card">
+          <div className="between" style={{ marginBottom: 10 }}>
+            <Eyebrow icon={<Award size={15} />}>{t('Awards for last week')}</Eyebrow>
+            <span className="muted small">{t('{from} to {to}', { from: niceDate(data.week.from), to: niceDate(data.week.to) })}</span>
+          </div>
+          <div className="awards">
+            {data.awards.map((a) => (
+              <Link to={`/m/${a.id}`} className={`award ${a.kind}`} key={a.kind}>
+                <span className="award-icon">{AWARD[a.kind].icon}</span>
+                <small>{AWARD[a.kind].label()}</small>
+                <b>{a.name}</b>
+                <span className="sub num">{AWARD[a.kind].detail(a.value)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {!season && <Seg value={period} onChange={setPeriod} options={[{ value: 'week', label: t('Week') }, { value: 'month', label: t('Month') }, { value: 'all', label: t('All time') }]} />}
       <Seg value={view} onChange={setView} options={[{ value: 'mosque', label: t('Mosques') }, { value: 'city', label: t('Cities') }, { value: 'country', label: t('Countries') }]} />
       {view === 'mosque' && <Seg value={sort} onChange={setSort} options={[{ value: 'total', label: t('Biggest jama‘ah') }, { value: 'consistency', label: t('Most consistent') }]} />}
@@ -72,12 +98,12 @@ export function WorldPage() {
       )}
 
       <section className="card tight">
-        {error ? <Problem error={error} retry={reload} /> : !data ? <Loading /> : view === 'mosque' ? (
+        {error ? <Problem error={error} retry={reload} /> : !data ? <Skeleton hero={false} cards={1} /> : view === 'mosque' ? (
           data.rows.length ? (
             <div className="list">
               {data.rows.map((r, i) => (
                 <Link key={r.id} to={`/m/${r.id}`} className="item">
-                  <span className="rank num">{i + 1}</span>
+                  <span className={`rank num${i < 3 ? ` top${i + 1}` : ''}`}>{i + 1}</span>
                   <span className="grow">
                     <b className="truncate" style={{ display: 'block' }}>{r.name}</b>
                     <span className="sub">{[r.city, r.country].filter(Boolean).join(', ')} · {plural(r.strivers, 'striver')}</span>
@@ -89,12 +115,12 @@ export function WorldPage() {
                 </Link>
               ))}
             </div>
-          ) : <div className="empty"><b>{t('Nothing here yet')}</b>{t('Mosques appear once they are approved and have check-ins.')}</div>
+          ) : <Empty icon={<Globe size={24} />} title={t('Nothing here yet')}>{t('Mosques appear once they are approved and have check-ins.')}</Empty>
         ) : data.groups.length ? (
           <div className="list">
             {data.groups.map((g, i) => (
               <div key={`${g.name}|${g.country}`} className="item">
-                <span className="rank num">{i + 1}</span>
+                <span className={`rank num${i < 3 ? ` top${i + 1}` : ''}`}>{i + 1}</span>
                 <span className="grow">
                   <b className="truncate" style={{ display: 'block' }}>{g.name}</b>
                   <span className="sub">{view === 'city' ? `${g.country} · ` : ''}{plural(g.mosques, 'mosque')}</span>
@@ -103,7 +129,7 @@ export function WorldPage() {
               </div>
             ))}
           </div>
-        ) : <div className="empty"><b>{t('Nothing here yet')}</b>{view === 'city' ? t('Cities appear once their mosques have check-ins.') : t('Countries appear once their mosques have check-ins.')}</div>}
+        ) : <Empty icon={<Globe size={24} />} title={t('Nothing here yet')}>{view === 'city' ? t('Cities appear once their mosques have check-ins.') : t('Countries appear once their mosques have check-ins.')}</Empty>}
       </section>
       {view === 'mosque' && (
         <p className="muted small">

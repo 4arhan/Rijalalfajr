@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Crown, Flame, UserRound } from 'lucide-react';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
 import { api, ApiError, getToken, setToken, type Me, type Standing } from './api';
@@ -126,6 +127,28 @@ export function Loading() {
   );
 }
 
+/** A screen-shaped placeholder while its data loads, so the page does not jump. */
+export function Skeleton({ hero = true, cards = 2 }: { hero?: boolean; cards?: number }) {
+  return (
+    <div className="skel" role="status" aria-label={t('Loading')}>
+      {hero && <div className="sk sk-hero" />}
+      {Array.from({ length: cards }, (_, i) => (
+        <div key={i} className="sk sk-card" />
+      ))}
+    </div>
+  );
+}
+
+export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
+  return (
+    <div className="empty">
+      {icon && <span className="empty-icon">{icon}</span>}
+      <b>{title}</b>
+      {children}
+    </div>
+  );
+}
+
 export function Problem({ error, retry }: { error: { message: string }; retry?: () => void }) {
   return (
     <div className="card empty">
@@ -163,6 +186,20 @@ export function Seg<T extends string>({ value, onChange, options }: { value: T; 
   );
 }
 
+/** The sections of a long page. */
+export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; icon?: ReactNode }[] }) {
+  return (
+    <div className="tabs" role="tablist">
+      {options.map((o) => (
+        <button key={o.value} type="button" role="tab" aria-selected={o.value === value} onClick={() => onChange(o.value)}>
+          {o.icon}
+          <span>{o.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="field">
@@ -189,15 +226,24 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // The page behind stays still while the sheet is open.
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = before;
+    };
   }, [onClose]);
-  return (
+  // Drawn at the top of the page, so nothing it was opened from can clip or move it.
+  return createPortal(
     <div className="scrim" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        <span className="grabber" aria-hidden="true" />
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -236,6 +282,22 @@ export function useAction() {
 
 // ---------- competition ----------
 
+/** A colour that stays the same for a name, so a long leaderboard is easier to scan. */
+function hueOf(name: string) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + (ch.codePointAt(0) ?? 0)) % 360;
+  return h;
+}
+
+export function Avatar({ name }: { name: string }) {
+  const hidden = name === 'Anonymous striver';
+  return (
+    <span className="avatar" style={hidden ? undefined : ({ '--h': hueOf(name) } as React.CSSProperties)}>
+      {hidden ? <UserRound size={17} /> : initials(name)}
+    </span>
+  );
+}
+
 export function Podium({ rows, prizes }: { rows: Standing[]; prizes?: (string | undefined)[] }) {
   const order = [1, 0, 2];
   return (
@@ -243,8 +305,11 @@ export function Podium({ rows, prizes }: { rows: Standing[]; prizes?: (string | 
       {order.map((i) => {
         const r = rows[i];
         return (
-          <div key={i} className={`place p${i + 1}`}>
-            <div className="medal">{r ? initials(r.name) : '–'}</div>
+          <div key={i} className={`place p${i + 1}${r ? '' : ' open'}`}>
+            <div className="medal">
+              {i === 0 && r && <Crown className="crown" size={20} aria-hidden="true" />}
+              {r ? initials(r.name) : '–'}
+            </div>
             <div className="who">{r ? showName(r.name) : t('Open')}</div>
             <div className="days">{r ? plural(r.days, 'day') : t('No one yet')}</div>
             <div className="step">
@@ -263,14 +328,22 @@ export function RankList({ rows, mine, from = 0 }: { rows: Standing[]; mine: Set
     <div className="list">
       {rows.slice(from).map((r) => (
         <div key={r.striverId} className={`item${mine.has(r.striverId) ? ' me' : ''}`}>
-          <span className="rank num">{r.rank}</span>
-          <span className="avatar">{initials(r.name)}</span>
+          <span className={`rank num${r.rank <= 3 ? ` top${r.rank}` : ''}`}>{r.rank}</span>
+          <Avatar name={r.name} />
           <span className="grow">
             <b className="truncate" style={{ display: 'block' }}>
               {showName(r.name)}
               {mine.has(r.striverId) && <span className="muted">{' '}{t('· you')}</span>}
             </b>
-            <span className="sub">{t('Best streak {bestStreak}', { bestStreak: r.bestStreak })}</span>
+            <span className="sub">
+              {r.streak >= 3 && (
+                <span className="flame num" title={t('Streak now')}>
+                  <Flame size={13} aria-hidden="true" />
+                  {r.streak}
+                </span>
+              )}
+              {t('Best streak {bestStreak}', { bestStreak: r.bestStreak })}
+            </span>
           </span>
           <span className="score num">
             <b>{r.days}</b>
@@ -282,23 +355,75 @@ export function RankList({ rows, mine, from = 0 }: { rows: Standing[]; mine: Set
   );
 }
 
+/** A number that counts up when it first appears. */
+export function CountUp({ value }: { value: number }) {
+  const [shown, setShown] = useState(() => (window.matchMedia('(prefers-reduced-motion: reduce)').matches || value < 2 ? value : 0));
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || value < 2) return setShown(value);
+    let raf = 0;
+    const start = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / 700);
+      setShown(Math.round(value * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{shown}</>;
+}
+
+const CONFETTI = ['#ffe08a', '#a8f0cf', '#7beabc', '#f0c066', '#eef8f2', '#e3a92f'];
+/** A short burst of colour for a good moment. It is decoration only. */
+export function Confetti({ pieces = 22 }: { pieces?: number }) {
+  return (
+    <div className="confetti" aria-hidden="true">
+      {Array.from({ length: pieces }, (_, i) => {
+        const angle = (i / pieces) * 360 + (i % 3) * 9;
+        const far = 70 + ((i * 37) % 70);
+        const style = {
+          '--x': `${Math.round(Math.cos((angle * Math.PI) / 180) * far)}px`,
+          '--y': `${Math.round(Math.sin((angle * Math.PI) / 180) * far) - 30}px`,
+          '--r': `${(i * 67) % 360}deg`,
+          background: CONFETTI[i % CONFETTI.length],
+          animationDelay: `${(i % 5) * 30}ms`,
+        } as React.CSSProperties;
+        return <i key={i} style={style} />;
+      })}
+    </div>
+  );
+}
+
 export function Ring({ value, size = 104, children }: { value: number; size?: number; children?: ReactNode }) {
   const r = (size - 12) / 2;
   const c = 2 * Math.PI * r;
+  // Drawn empty, then filled, so the ring sweeps round when the screen opens.
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(Math.min(1, Math.max(0, value))));
+    return () => cancelAnimationFrame(id);
+  }, [value]);
   return (
     <div className="ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} role="img" aria-label={t('{n} percent', { n: Math.round(value * 100) })}>
+        <defs>
+          <linearGradient id="ring-g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#a8f0cf" />
+            <stop offset="1" stopColor="#f0c066" />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(168,240,207,.16)" strokeWidth="9" />
         <circle
+          className="ring-fill"
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="#a8f0cf"
+          stroke="url(#ring-g)"
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={c}
-          strokeDashoffset={c * (1 - Math.min(1, Math.max(0, value)))}
+          strokeDashoffset={c * (1 - shown)}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>

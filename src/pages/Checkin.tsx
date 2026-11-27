@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Check, Clock, IdCard, MapPin, ScanLine } from 'lucide-react';
+import { Check, Clock, Crown, IdCard, MapPin, ScanLine, Sparkles } from 'lucide-react';
 import { api, ApiError, type Win } from '../api';
-import { Eyebrow, Loading, Qr, Scanner, Screen, Sheet, useAction, useMe, useSession } from '../ui';
+import { Confetti, Eyebrow, Loading, Qr, Scanner, Screen, Sheet, Skeleton, useAction, useMe, useSession } from '../ui';
 import { AuthForm } from './Auth';
 import { deviceId, getPosition, niceDate, plural, timeIn } from '../lib/util';
 import { shareCard } from '../lib/share';
 import { t, tn, tx } from '../lib/i18n';
+import { milestoneText } from './Social';
 
 const isCheckinCode = (t: string) => /(^|\/c\/)[rsh]\.[a-z0-9]+\./.test(t.trim());
 
@@ -57,7 +58,7 @@ interface Preview {
 interface Result {
   mosque: { id: string; name: string };
   date: string;
-  results: { striverId: string; name: string; fresh: boolean; streak: number; best: number }[];
+  results: { striverId: string; name: string; fresh: boolean; streak: number; best: number; reached?: { kind: string; value: number }[] }[];
 }
 
 export function CheckinPage() {
@@ -116,7 +117,7 @@ export function CheckinPage() {
       </Screen>
     );
   }
-  if (!preview) return <Screen title={t('Check in')}><Loading /></Screen>;
+  if (!preview) return <Screen title={t('Check in')}><Skeleton cards={1} /></Screen>;
   const { mosque, window: win } = preview;
 
   if (result) return <Done result={result} />;
@@ -173,7 +174,8 @@ function Done({ result }: { result: Result }) {
   const anyFresh = result.results.some((r) => r.fresh);
   return (
     <Screen title={t('Checked in')} eyebrow={niceDate(result.date, { weekday: 'long', day: 'numeric', month: 'long' })}>
-      <section className="hero" style={{ textAlign: 'center' }}>
+      <section className="hero done-hero" style={{ textAlign: 'center' }}>
+        {anyFresh && <Confetti />}
         <div className="done-mark"><Check size={44} strokeWidth={2.6} /></div>
         <h2 style={{ fontSize: 24, fontWeight: 750 }}>{anyFresh ? t('Fajr checked in') : t('Already checked in today')}</h2>
         <p className="muted" style={{ marginTop: 4 }}>{result.mosque.name}</p>
@@ -182,6 +184,15 @@ function Done({ result }: { result: Result }) {
           <div><label>{t('Best')}</label><b className="num">{plural(first.best, 'day')}</b></div>
         </div>
       </section>
+      {result.results.flatMap((r) => (r.reached ?? []).map((m) => ({ ...m, name: r.name }))).map((m, i) => (
+        <div className={`note reached${m.kind === 'streak' && m.value >= 40 ? ' gold' : ''}`} key={i}>
+          {m.kind === 'streak' && m.value >= 40 ? <Crown size={20} /> : <Sparkles size={20} />}
+          <span>
+            <b style={{ display: 'block' }}>{result.results.length > 1 ? `${m.name}: ${milestoneText(m.kind, m.value)}` : milestoneText(m.kind, m.value)}</b>
+            {m.kind === 'streak' && m.value >= 40 ? t('Forty dawns in a row. This name is now on the mosque’s roll of honour.') : t('A new milestone. Your mosque can say Masha’Allah.')}
+          </span>
+        </div>
+      ))}
       {result.results.length > 1 && (
         <section className="card tight">
           <div className="list">

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError } from '../api';
+import { ApiError, type Win } from '../api';
 import { dateLocale, t, tn } from './i18n';
 
 /** Load data for a screen, with reload. */
@@ -42,6 +42,15 @@ export function untilText(iso: string, now: Date) {
   const unit = (n: number, u: 'hour' | 'minute') => new Intl.NumberFormat(dateLocale(), { style: 'unit', unit: u, unitDisplay: 'narrow' }).format(n);
   const h = Math.floor(mins / 60);
   return h ? `${unit(h, 'hour')} ${unit(mins % 60, 'minute')}` : unit(mins, 'minute');
+}
+
+/** The part of the day at a mosque, which sets the sky behind the Today screen. */
+export function skyPhase(win: Win | undefined, timeZone: string, now: Date): 'night' | 'dawn' | 'day' {
+  if (!win || win.inWindow) return 'dawn';
+  // Still waiting for today's Fajr: it is night.
+  if (win.date === win.today) return 'night';
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  return hour < 18 ? 'day' : 'night';
 }
 
 export function hijri(d = new Date()) {

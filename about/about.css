@@ -1455,3 +1455,21 @@ summary:focus-visible,
     stroke-dashoffset: 141.4;
   }
 }
+
+/* ---------- a tag on what is new ---------- */
+.card .tag {
+  position: absolute;
+  top: 24px;
+  inset-inline-end: 24px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  background: rgba(227, 169, 47, 0.18);
+  color: #8a6209;
+  font-size: 12.5px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+.bento.on-dark .card .tag {
+  background: rgba(240, 192, 102, 0.18);
+  color: #f0c066;
+}

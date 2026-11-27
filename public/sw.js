@@ -1,6 +1,6 @@
 // Keeps the app shell on the phone so it opens with no signal.
 // It never stores or answers API calls: those always go to the network.
-const CACHE = 'raf-shell-v1';
+const CACHE = 'raf-shell-v2';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.add('/')).then(() => self.skipWaiting()));

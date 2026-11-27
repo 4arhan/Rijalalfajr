@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Award, Gift, Pencil, Plus, ScrollText, Trash2, Trophy, Users } from 'lucide-react';
+import { Award, Gift, HandHeart, Pencil, Plus, ScrollText, Trash2, Trophy, Users } from 'lucide-react';
 import { api, DEFAULT_LABELS, GROUPS, type Group, type Labels, type Prize, type Standing } from '../api';
-import { Eyebrow, Field, Loading, Podium, Problem, RankList, Screen, Seg, Switch, useAction, useSession } from '../ui';
+import { Eyebrow, Field, Loading, Podium, Problem, RankList, Screen, Seg, Skeleton, Switch, useAction, useSession } from '../ui';
 import { addDays, niceDate, plural, useLoad, showLabel, showName } from '../lib/util';
 import { t, tn } from '../lib/i18n';
 
@@ -16,6 +16,7 @@ interface ChallengeData {
   prizes: Prize[];
   rows: Standing[];
   hidden?: boolean;
+  thanks?: { name: string; gift: string }[];
   canEdit: boolean;
 }
 
@@ -39,7 +40,7 @@ export function ChallengePage() {
   }, [data, grp]);
 
   if (error) return <Screen title={t('Challenge')} back><Problem error={error} retry={reload} /></Screen>;
-  if (!data) return <Screen title={t('Challenge')} back><Loading /></Screen>;
+  if (!data) return <Screen title={t('Challenge')} back><Skeleton /></Screen>;
   const ch = data.challenge;
   const total = dayCount(ch.startDate, ch.endDate);
   const day = Math.min(total, Math.max(0, dayCount(ch.startDate, data.today)));
@@ -77,7 +78,7 @@ export function ChallengePage() {
             {data.prizes.filter((p) => p.place !== null && (grp === 'all' || p.grp === 'all' || p.grp === grp)).map((p, i) => (
               <div className="item" key={`p${i}`}>
                 <span className="pill gold">{ORDINAL[p.place! - 1]}</span>
-                <span className="grow"><b>{p.title}</b><span className="sub" style={{ display: 'block' }}>{[label(p.grp), p.detail, p.sponsor && `Given by ${p.sponsor}`].filter(Boolean).join(' · ')}</span></span>
+                <span className="grow"><b>{p.title}</b><span className="sub" style={{ display: 'block' }}>{[label(p.grp), p.detail, p.sponsor && t('Given by {sponsor}', { sponsor: p.sponsor })].filter(Boolean).join(' · ')}</span></span>
               </div>
             ))}
             {milestones.map((p, i) => {
@@ -85,11 +86,25 @@ export function ChallengePage() {
               return (
                 <div className="item" key={`m${i}`}>
                   <span className="pill">{t('{milestoneDays} days', { milestoneDays: p.milestoneDays })}</span>
-                  <span className="grow"><b>{p.title}</b><span className="sub" style={{ display: 'block' }}>{[label(p.grp), p.detail, p.sponsor && `Given by ${p.sponsor}`].filter(Boolean).join(' · ')}</span></span>
+                  <span className="grow"><b>{p.title}</b><span className="sub" style={{ display: 'block' }}>{[label(p.grp), p.detail, p.sponsor && t('Given by {sponsor}', { sponsor: p.sponsor })].filter(Boolean).join(' · ')}</span></span>
                   <span className="sub num">{t('{reached} reached', { reached: reached })}</span>
                 </div>
               );
             })}
+          </div>
+        </section>
+      )}
+
+      {!!data.thanks?.length && (
+        <section className="card">
+          <Eyebrow icon={<HandHeart size={15} />}>{t('With thanks to')}</Eyebrow>
+          <div className="list">
+            {data.thanks.map((x, i) => (
+              <div className="item" key={i}>
+                <span className="icon gold"><Gift size={18} /></span>
+                <span className="grow"><b>{x.name}</b><span className="sub" style={{ display: 'block' }}>{x.gift}</span></span>
+              </div>
+            ))}
           </div>
         </section>
       )}

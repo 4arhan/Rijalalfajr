@@ -180,7 +180,7 @@ export function SponsorCards({ sponsors }: { sponsors: Sponsor[] }) {
           <p className="small"><b>{t('Offers:')}</b> {s.kinds.map(kindLabel).join(', ')}</p>
           {s.note && <p className="small" style={{ marginTop: 6, whiteSpace: 'pre-wrap' }}>{s.note}</p>}
           <div className="row" style={{ marginTop: 14, flexWrap: 'wrap' }}>
-            <a className="btn sm" href={`mailto:${s.email}?subject=${encodeURIComponent('Sponsoring Fajr at our mosque')}`}><Mail size={16} /> {s.email}</a>
+            <a className="btn sm" href={`mailto:${s.email}?subject=${encodeURIComponent(t('Sponsoring Fajr at our mosque'))}`}><Mail size={16} /> {s.email}</a>
             {s.phone && <a className="btn soft sm" href={`tel:${s.phone.replace(/[^\d+]/g, '')}`}><Phone size={16} /> {s.phone}</a>}
           </div>
         </section>

@@ -486,3 +486,271 @@ describe('more ways to take part', () => {
   });
 });
 
+
+describe('community', () => {
+  let dawn: string;
+  let rival: string;
+  let lead: Awaited<ReturnType<typeof signup>>;
+  let rivalLead: Awaited<ReturnType<typeof signup>>;
+  let m1: Awaited<ReturnType<typeof signup>>;
+  let m2: Awaited<ReturnType<typeof signup>>;
+  let star: string;
+  let seq = 0;
+  // Earlier tests leave the clock on the next morning, so today is read from the mosque.
+  let T: string;
+  // History written straight into the database, as if these dawns had been checked in.
+  const put = (striverId: string, mosque: string, date: string, o: { method?: string; offset?: number } = {}) =>
+    db.query(`insert into checkins (id, striver_id, mosque_id, fajr_date, at, method, offset_sec) values ($1,$2,$3,$4,$5,$6,$7) on conflict do nothing`, [
+      `hist${++seq}`, striverId, mosque, date, new Date(`${date}T06:00:00Z`), o.method ?? 'qr', o.offset ?? 0,
+    ]);
+  const roster = async (mosque: string, token: string, name: string) => (await call('POST', `/mosques/${mosque}/roster`, { token, body: { name, grp: 'kids' } })).json.id as string;
+  const community = async (token?: string, mosque = dawn) => (await call('GET', `/mosques/${mosque}/community`, { token })).json;
+
+  beforeAll(async () => {
+    lead = await signup('lead@example.com', 'Imran Lead');
+    rivalLead = await signup('rival@example.com', 'Rashid Rival');
+    dawn = (await call('POST', '/mosques', { token: lead.token, body: { name: 'Dawn Mosque', city: 'London', country: 'United Kingdom', ...LONDON } })).json.id;
+    rival = (await call('POST', '/mosques', { token: rivalLead.token, body: { name: 'Rival Mosque', city: 'Luton', country: 'United Kingdom', ...LONDON } })).json.id;
+    m1 = await signup('m1@example.com', 'Bilal Member');
+    m2 = await signup('m2@example.com', 'Omar Member');
+    for (const m of [m1, m2]) await call('PATCH', '/me', { token: m.token, body: { homeMosqueId: dawn } });
+    T = (await call('GET', `/mosques/${dawn}`)).json.window.today;
+  });
+
+  it('puts a name on the roll of honour at forty dawns in a row, and takes it back with the tick', async () => {
+    star = await roster(dawn, lead.token, 'Idris Noor');
+    for (let d = 39; d >= 1; d--) await put(star, dawn, addDays(T, -d));
+    expect((await community(lead.token)).honour).toEqual([]);
+    expect((await call('POST', `/mosques/${dawn}/mark`, { token: lead.token, body: { striverId: star } })).json.streak).toBe(40);
+    const seen = await community(lead.token);
+    expect(seen.honour).toEqual([{ striverId: star, name: 'Idris Noor', date: T, top: 40 }]);
+    expect(seen.feed[0]).toMatchObject({ striverId: star, kind: 'streak', value: 40, kudos: 0, mine: false });
+    // Without an account: a first name and an initial.
+    expect((await community()).honour[0].name).toBe('Idris N.');
+    await call('POST', `/mosques/${dawn}/mark`, { token: lead.token, body: { striverId: star, present: false } });
+    expect((await community(lead.token)).honour).toEqual([]);
+    await call('POST', `/mosques/${dawn}/mark`, { token: lead.token, body: { striverId: star } });
+    expect((await community(lead.token)).honour).toHaveLength(1);
+    await call('PATCH', `/mosques/${dawn}`, { token: lead.token, body: { publicBoard: false } });
+    expect(await community()).toMatchObject({ hidden: true, honour: [], feed: [] });
+    await call('PATCH', `/mosques/${dawn}`, { token: lead.token, body: { publicBoard: true } });
+  });
+
+  it('lets others say Masha’Allah for a milestone, and tells the person', async () => {
+    const s = await screenCode(lead.token, dawn);
+    const first = await call('POST', '/checkin', { token: m2.token, body: { code: s.code, striverIds: [m2.self] } });
+    expect(first.json.results[0].reached).toEqual([{ kind: 'total', value: 1 }]);
+    const code = (await call('GET', '/me', { token: m2.token })).json.user.inviteCode;
+    await call('POST', '/buddies', { token: m1.token, body: { code } });
+    const before = await call('GET', '/pulse', { token: m1.token });
+    expect(before.json.toCheer).toHaveLength(1);
+    expect(before.json.toCheer[0]).toMatchObject({ striverId: m2.self, name: 'Omar Member', kind: 'total', value: 1 });
+    const id = before.json.toCheer[0].id;
+    expect((await call('POST', `/milestones/${id}/kudos`, { token: m2.token, body: { on: true } })).json.error.code).toBe('self');
+    expect((await call('POST', `/milestones/${id}/kudos`, { token: m1.token, body: { on: true } })).json).toEqual({ kudos: 1, mine: true });
+    expect((await call('POST', `/milestones/${id}/kudos`, { token: m1.token, body: { on: true } })).json.kudos).toBe(1);
+    expect((await call('GET', '/pulse', { token: m1.token })).json.toCheer).toHaveLength(0);
+    expect((await community(m1.token)).feed.find((f: any) => f.id === id)).toMatchObject({ kudos: 1, mine: true, own: false });
+    expect((await community(m2.token)).feed.find((f: any) => f.id === id)).toMatchObject({ kudos: 1, mine: false, own: true });
+    expect((await call('GET', '/pulse', { token: m2.token })).json.cheers).toEqual([{ milestoneId: id, kind: 'total', value: 1, owner: null, names: ['Bilal'], count: 1 }]);
+    await call('POST', '/kudos/seen', { token: m2.token });
+    expect((await call('GET', '/pulse', { token: m2.token })).json.cheers).toEqual([]);
+    expect((await call('POST', `/milestones/${id}/kudos`, { token: m1.token, body: { on: false } })).json).toEqual({ kudos: 0, mine: false });
+  });
+
+  it('shows buddies who is awake before Fajr', async () => {
+    expect((await call('GET', '/pulse', { token: m2.token })).json.awake).toMatchObject({ canTap: true, mine: false, up: [], mosqueCount: 0 });
+    expect((await call('POST', '/awake', { token: m1.token })).json).toEqual({ ok: true, date: T });
+    expect((await call('GET', '/pulse', { token: m1.token })).json.awake).toMatchObject({ mine: true, up: [], mosqueCount: 1 });
+    expect((await call('GET', '/pulse', { token: m2.token })).json.awake).toMatchObject({ mine: false, up: ['Bilal'], mosqueCount: 1 });
+    expect((await call('GET', '/buddies', { token: m2.token })).json.buddies[0]).toMatchObject({ name: 'Bilal Member', awake: true });
+    const saved = now;
+    now = new Date(win.sunrise.getTime() + 3 * 3600000);
+    expect((await call('POST', '/awake', { token: m2.token })).json.error.code).toBe('too_early');
+    expect((await call('GET', '/pulse', { token: m2.token })).json.awake.canTap).toBe(false);
+    now = saved;
+    const loner = await signup('loner@example.com', 'Loner');
+    expect((await call('POST', '/awake', { token: loner.token })).json.error.code).toBe('no_home');
+    expect((await call('GET', '/pulse', { token: loner.token })).json.awake).toBeNull();
+  });
+
+  it('takes a request to be excused, which the mosque approves in one tap', async () => {
+    const ask = { striverId: m1.self, fromDate: addDays(T, 1), toDate: addDays(T, 2), reason: 'Travelling for work' };
+    expect((await call('POST', '/excuse-requests', { token: m2.token, body: ask })).status).toBe(403);
+    expect((await call('POST', '/excuse-requests', { token: m1.token, body: { ...ask, toDate: addDays(T, 30) } })).json.error.code).toBe('bad_date');
+    const made = await call('POST', '/excuse-requests', { token: m1.token, body: ask });
+    expect(made.status).toBe(200);
+    expect((await call('GET', '/excuse-requests', { token: m1.token })).json.requests[0]).toMatchObject({ status: 'pending', mosque: 'Dawn Mosque', reason: 'Travelling for work' });
+    expect((await call('GET', `/mosques/${dawn}/excuse-requests`, { token: m2.token })).status).toBe(403);
+    expect((await call('GET', `/mosques/${dawn}/stats`, { token: lead.token })).json.pendingExcuses).toBe(1);
+    expect((await call('GET', `/mosques/${dawn}/excuse-requests`, { token: lead.token })).json.requests[0]).toMatchObject({ name: 'Bilal Member', status: 'pending' });
+    expect((await call('POST', `/excuse-requests/${made.json.id}/decide`, { token: m2.token, body: { approve: true } })).status).toBe(403);
+    expect((await call('POST', `/excuse-requests/${made.json.id}/decide`, { token: lead.token, body: { approve: true } })).status).toBe(200);
+    expect((await call('POST', `/excuse-requests/${made.json.id}/decide`, { token: lead.token, body: { approve: false } })).json.error.code).toBe('decided');
+    expect((await call('GET', `/strivers/${m1.self}/stats`, { token: m1.token })).json.excused).toEqual([addDays(T, 1), addDays(T, 2)]);
+    expect((await call('GET', `/mosques/${dawn}/stats`, { token: lead.token })).json.pendingExcuses).toBe(0);
+    // A request that is still waiting can be taken back; an answered one stays on record.
+    const again = await call('POST', '/excuse-requests', { token: m1.token, body: { ...ask, fromDate: addDays(T, 5), toDate: addDays(T, 5) } });
+    await call('DELETE', `/excuse-requests/${again.json.id}`, { token: m1.token });
+    await call('DELETE', `/excuse-requests/${made.json.id}`, { token: m1.token });
+    expect((await call('GET', '/excuse-requests', { token: m1.token })).json.requests.map((r: any) => r.status)).toEqual(['approved']);
+  });
+
+  it('lists regulars who have missed three dawns, for the imam', async () => {
+    const quiet = await roster(dawn, lead.token, 'Zakariya Quiet');
+    for (let d = 12; d >= 5; d--) await put(quiet, dawn, addDays(T, -d));
+    const once = await roster(dawn, lead.token, 'Came Once');
+    await put(once, dawn, addDays(T, -9));
+    expect((await call('GET', `/mosques/${dawn}/missing`, { token: m1.token })).status).toBe(403);
+    const list = await call('GET', `/mosques/${dawn}/missing`, { token: lead.token });
+    expect(list.json.people).toEqual([{ id: quiet, name: 'Zakariya Quiet', grp: 'kids', managed: true, last: addDays(T, -5), recent: 8, missed: 4 }]);
+    expect((await call('GET', `/mosques/${dawn}/stats`, { token: lead.token })).json.missing).toBe(1);
+    // Days the mosque excused are not misses.
+    for (const d of [1, 2]) await call('POST', `/mosques/${dawn}/excuse`, { token: lead.token, body: { striverId: quiet, date: addDays(T, -d), excused: true } });
+    expect((await call('GET', `/mosques/${dawn}/missing`, { token: lead.token })).json.people).toEqual([]);
+  });
+
+  it('keeps a prize wish-list, and names a giver once the mosque confirms', async () => {
+    expect((await call('POST', `/mosques/${dawn}/wishes`, { token: m1.token, body: { title: 'Bicycle', qty: 2 } })).status).toBe(403);
+    const wish = await call('POST', `/mosques/${dawn}/wishes`, { token: lead.token, body: { title: 'Bicycle', qty: 2, detail: 'For the kids podium' } });
+    expect((await call('GET', `/mosques/${dawn}`)).json.wishes).toEqual([{ id: wish.json.id, title: 'Bicycle', qty: 2, detail: 'For the kids podium', given: 0, mine: false, givenBy: [] }]);
+    expect((await call('POST', `/wishes/${wish.json.id}/pledge`, { body: { name: 'Noor Cycles', email: 'a@b.co' } })).status).toBe(401);
+    const offer = await call('POST', `/wishes/${wish.json.id}/pledge`, { token: m2.token, body: { name: 'Noor Cycles', qty: 1, email: 'Shop@Noor.example', phone: '0121', note: 'Any colour' } });
+    expect(offer.status).toBe(200);
+    // Nothing is public until the admin confirms it.
+    expect((await call('GET', `/mosques/${dawn}`)).json).toMatchObject({ thanks: [], wishes: [{ given: 0, givenBy: [] }] });
+    expect((await call('GET', `/mosques/${dawn}`, { token: m2.token })).json.wishes[0].mine).toBe(true);
+    expect((await call('GET', `/mosques/${dawn}/wishes`, { token: m1.token })).status).toBe(403);
+    expect((await call('GET', `/mosques/${dawn}/stats`, { token: lead.token })).json.wishOffers).toBe(1);
+    const admin2 = await call('GET', `/mosques/${dawn}/wishes`, { token: lead.token });
+    expect(admin2.json.wishes[0].pledges).toEqual([{ id: offer.json.id, name: 'Noor Cycles', qty: 1, email: 'shop@noor.example', phone: '0121', note: 'Any colour', confirmed: false }]);
+    expect((await call('POST', `/wish-pledges/${offer.json.id}/confirm`, { token: m1.token, body: { confirmed: true } })).status).toBe(403);
+    await call('POST', `/wish-pledges/${offer.json.id}/confirm`, { token: lead.token, body: { confirmed: true } });
+    expect((await call('GET', `/mosques/${dawn}`)).json).toMatchObject({ thanks: ['Noor Cycles'], wishes: [{ given: 1, givenBy: ['Noor Cycles'] }] });
+    expect((await screenCode(lead.token, dawn)).thanks).toEqual(['Noor Cycles']);
+    const ch = await call('POST', '/challenges', { token: lead.token, body: { scopeType: 'mosque', scopeId: dawn, name: 'Winter', startDate: T, endDate: addDays(T, 9) } });
+    expect((await call('GET', `/challenges/${ch.json.id}`)).json.thanks).toEqual([{ name: 'Noor Cycles', gift: 'Bicycle' }]);
+    expect((await call('DELETE', `/wish-pledges/${offer.json.id}`, { token: m1.token })).status).toBe(403);
+    expect((await call('DELETE', `/wish-pledges/${offer.json.id}`, { token: m2.token })).status).toBe(200);
+    expect((await call('GET', `/mosques/${dawn}`)).json.thanks).toEqual([]);
+    await call('DELETE', `/wishes/${wish.json.id}`, { token: lead.token });
+    expect((await call('GET', `/mosques/${dawn}`)).json.wishes).toEqual([]);
+  });
+
+  it('ranks families as a unit, with a family of the month', async () => {
+    const dad = await signup('abu@example.com', 'Abu Dawud');
+    await call('PATCH', '/me', { token: dad.token, body: { homeMosqueId: dawn } });
+    const son = (await call('POST', '/family', { token: dad.token, body: { name: 'Dawud', grp: 'kids' } })).json.id;
+    for (const d of [3, 2, 1]) await put(dad.self, dawn, addDays(T, -d));
+    for (const d of [2, 1]) await put(son, dawn, addDays(T, -d));
+    // Last month: three dawns between them.
+    for (const d of ['2026-10-10', '2026-10-11']) await put(dad.self, dawn, d);
+    await put(son, dawn, '2026-10-10');
+    const seen = await community(m1.token);
+    expect(seen.families).toHaveLength(1);
+    expect(seen.families[0]).toMatchObject({ name: null, first: 'Abu', members: 2, days: 5, perMember: 2.5, mine: false });
+    expect(seen.familyOfMonth).toMatchObject({ month: '2026-10', family: { first: 'Abu', days: 3, perMember: 1.5 } });
+    expect((await community(dad.token)).families[0].mine).toBe(true);
+    await call('PATCH', '/me', { token: dad.token, body: { familyName: 'Banu Dawud' } });
+    expect((await call('GET', '/me', { token: dad.token })).json.user.familyName).toBe('Banu Dawud');
+    expect((await community()).families[0]).toMatchObject({ name: 'Banu Dawud', first: 'Abu' });
+    await call('PATCH', '/me', { token: dad.token, body: { anonymous: true } });
+    expect((await community(m1.token)).families[0]).toMatchObject({ name: null, first: null, days: 5 });
+    // A hidden name stays a stand-in for visitors too, never a shortened "name".
+    expect((await call('GET', `/mosques/${dawn}/leaderboard?period=week`)).json.rows.map((r: any) => r.name)).toContain('Anonymous striver');
+    await call('PATCH', '/me', { token: dad.token, body: { anonymous: false } });
+  });
+
+  it('adds many names at once from a spreadsheet', async () => {
+    const people = [
+      { name: 'Idris Noor', grp: 'kids' },
+      { name: 'Hafsa Ali', grp: 'kids', className: 'Year 5' },
+      { name: 'Maryam Ali', grp: 'youth', className: 'year 5' },
+      { name: 'hafsa ali', grp: 'kids' },
+    ];
+    expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: m1.token, body: { people } })).status).toBe(403);
+    expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: lead.token, body: { people: [] } })).status).toBe(400);
+    expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: lead.token, body: { people } })).json).toEqual({ added: 2, skipped: 2, classesMade: 1 });
+    const list = (await call('GET', `/mosques/${dawn}/roster`, { token: lead.token })).json.people;
+    const hafsa = list.find((p: any) => p.name === 'Hafsa Ali');
+    expect(hafsa).toMatchObject({ grp: 'kids', managed: true });
+    expect(list.find((p: any) => p.name === 'Maryam Ali')).toMatchObject({ grp: 'youth', classId: hafsa.classId });
+    expect((await call('GET', `/mosques/${dawn}/classes`, { token: lead.token })).json.classes).toMatchObject([{ name: 'Year 5', members: 2 }]);
+  });
+
+  it('gives weekly awards for the most consistent, the most improved and the best newcomer', async () => {
+    // Today is Friday 27 November: the finished week is 16 to 22 November, and the one before it 9 to 15.
+    const steady = await roster(rival, rivalLead.token, 'Steady Salih');
+    for (let d = 9; d <= 22; d++) await put(steady, rival, `2026-11-${String(d).padStart(2, '0')}`, { offset: -300 });
+    const riser = await roster(rival, rivalLead.token, 'Rising Rafi');
+    for (const d of ['2026-11-01', '2026-11-10', '2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20']) await put(riser, rival, d);
+    const fresh = await roster(rival, rivalLead.token, 'New Nabil');
+    for (const d of ['2026-11-18', '2026-11-20', '2026-11-22']) await put(fresh, rival, d);
+    const seen = await community(rivalLead.token, rival);
+    expect(seen.week).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+    expect(seen.awards).toEqual([
+      { kind: 'consistent', striverId: steady, name: 'Steady Salih', days: 7, prev: 7 },
+      { kind: 'improved', striverId: riser, name: 'Rising Rafi', days: 5, prev: 1 },
+      { kind: 'newcomer', striverId: fresh, name: 'New Nabil', days: 3, prev: 0 },
+    ]);
+    expect((await community(undefined, rival)).awards[0].name).toBe('Steady S.');
+    // The world page gives the same three awards to mosques.
+    const owner = (await call('POST', '/auth/login', { body: { email: 'owner@example.com', password: 'password123' } })).json.token;
+    await call('POST', `/owner/mosques/${rival}`, { token: owner, body: { verified: true } });
+    const world = await call('GET', '/world');
+    expect(world.json.week).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+    expect(world.json.awards).toContainEqual({ kind: 'newcomer', id: rival, name: 'Rival Mosque', city: 'Luton', country: 'United Kingdom', value: 15 });
+  });
+
+  it('plays a friendly match between two mosques by the share of members who show up', async () => {
+    const start = addDays(T, 1);
+    expect((await call('POST', `/mosques/${dawn}/matches`, { token: m1.token, body: { opponentId: rival, startDate: start } })).status).toBe(403);
+    expect((await call('POST', `/mosques/${dawn}/matches`, { token: lead.token, body: { opponentId: dawn, startDate: start } })).status).toBe(400);
+    expect((await call('POST', `/mosques/${dawn}/matches`, { token: lead.token, body: { opponentId: rival, startDate: T } })).json.error.code).toBe('bad_date');
+    const made = await call('POST', `/mosques/${dawn}/matches`, { token: lead.token, body: { opponentId: rival, startDate: start } });
+    expect(made.status).toBe(200);
+    expect((await call('POST', `/mosques/${rival}/matches`, { token: rivalLead.token, body: { opponentId: dawn, startDate: start } })).json.error.code).toBe('exists');
+    // An invitation is not public, and only the invited mosque can answer it.
+    expect((await call('GET', `/mosques/${dawn}`)).json.matches).toEqual([]);
+    expect((await call('GET', `/mosques/${rival}/stats`, { token: rivalLead.token })).json.matchInvites).toBe(1);
+    expect((await call('GET', `/mosques/${rival}/matches`, { token: rivalLead.token })).json.matches[0]).toMatchObject({ status: 'invited', toAnswer: true });
+    expect((await call('GET', `/mosques/${dawn}/matches`, { token: lead.token })).json.matches[0]).toMatchObject({ status: 'invited', toAnswer: false });
+    expect((await call('POST', `/matches/${made.json.id}/respond`, { token: lead.token, body: { accept: true } })).status).toBe(403);
+    expect((await call('POST', `/matches/${made.json.id}/respond`, { token: rivalLead.token, body: { accept: true } })).status).toBe(200);
+    expect((await call('GET', `/mosques/${rival}`)).json.matches[0]).toMatchObject({ status: 'upcoming', startDate: start, endDate: addDays(start, 6), a: { id: dawn, share: 0 }, b: { id: rival, share: 0 } });
+    // Two days in: Rival's four members prayed six of their eight dawns.
+    const members = (await call('GET', `/mosques/${rival}/roster`, { token: rivalLead.token })).json.people.filter((p: any) => p.member);
+    expect(members).toHaveLength(4);
+    for (const p of members.slice(0, 3)) for (const d of [1, 2]) await put(p.id, rival, addDays(T, d));
+    const saved = now;
+    now = new Date(now.getTime() + 2 * 86400000);
+    const live = (await call('GET', `/mosques/${dawn}`)).json.matches[0];
+    expect(live).toMatchObject({ status: 'active', a: { name: 'Dawn Mosque', share: 0 }, b: { name: 'Rival Mosque', members: 4, checkins: 6, share: 75 } });
+    now = saved;
+    await call('DELETE', `/matches/${made.json.id}`, { token: lead.token });
+    expect((await call('GET', `/mosques/${rival}`)).json.matches).toEqual([]);
+    const second = await call('POST', `/mosques/${dawn}/matches`, { token: lead.token, body: { opponentId: rival, startDate: start } });
+    await call('POST', `/matches/${second.json.id}/respond`, { token: rivalLead.token, body: { accept: false } });
+    expect((await call('GET', `/mosques/${dawn}/matches`, { token: lead.token })).json.matches).toEqual([]);
+  });
+
+  it('shows a person which weekday they miss and whether they arrive earlier', async () => {
+    const p = await signup('pattern@example.com', 'Pattern Person');
+    await call('PATCH', '/me', { token: p.token, body: { homeMosqueId: dawn } });
+    // Eight weeks, every day but Mondays; five minutes late a month ago, two minutes early now.
+    for (let d = 56; d >= 1; d--) {
+      const date = addDays(T, -d);
+      if (new Date(date + 'T00:00:00Z').getUTCDay() === 1) continue;
+      await put(p.self, dawn, date, { offset: d >= 30 ? 300 : -120 });
+    }
+    const mine = (await call('GET', `/strivers/${p.self}/stats`, { token: p.token })).json.patterns;
+    expect(mine.days).toBe(56);
+    expect(mine.weekdays[0]).toEqual({ came: 0, of: 8 });
+    expect(mine.weekdays[4]).toEqual({ came: 8, of: 8 });
+    expect(mine).toMatchObject({ hardest: 0, arrival: { now: -2, before: 5 } });
+    expect(mine.strongest).not.toBe(0);
+    // Mosque staff see attendance, not a person's habits.
+    expect((await call('GET', `/strivers/${p.self}/stats`, { token: lead.token })).json.patterns).toBeNull();
+    expect((await call('GET', `/strivers/${m2.self}/stats`, { token: m2.token })).json.patterns).toBeNull();
+  });
+});

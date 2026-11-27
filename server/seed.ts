@@ -2,6 +2,7 @@
 // is something to look at. Run with `npm run seed`. Never run it on real data.
 import { openDb } from './db.js';
 import { addDays, fajrWindow, localDate } from './fajr.js';
+import { STREAK_MARKS, TOTAL_MARKS } from './board.js';
 import { hashPassword, newCode, newId } from './security.js';
 
 const MOSQUES = [
@@ -61,7 +62,8 @@ for (const [mi, m] of MOSQUES.entries()) {
 
   const today = localDate(now, m.timezone);
   const timing = { lat: m.lat, lng: m.lng, timezone: m.timezone, calc_method: m.method, open_before_min: 30, iqamah_after_min: 20, close_after_sunrise_min: 0 };
-  const people: { id: string; keen: number }[] = [];
+  // `skip` fixes a person's mornings (counted in days ago) where the demo needs a known story.
+  const people: { id: string; keen: number; skip?: (d: number) => boolean }[] = [];
   for (let i = 0; i < m.size; i++) {
     const sid = newId();
     const grp = GRP[i % GRP.length];
@@ -78,7 +80,16 @@ for (const [mi, m] of MOSQUES.entries()) {
     const kid = newId();
     await db.query(`insert into strivers (id, name, grp, user_id, home_mosque_id, squad_id, card_code) values ($1,'Yusuf Rahman','adults',$2,$3,$4,$5)`, [self, userId, id, squads[0], newId(14)]);
     await db.query(`insert into strivers (id, name, grp, guardian_user_id, home_mosque_id, card_code) values ($1,'Musa Rahman','kids',$2,$3,$4)`, [kid, userId, id, newId(14)]);
-    people.push({ id: self, keen: 2 }, { id: kid, keen: 0.86 });
+    // The demo account used to miss one particular weekday, then stopped missing three weeks ago.
+    people.push({ id: self, keen: 2, skip: (d) => d >= 22 && d % 7 === 1 }, { id: kid, keen: 0.86 });
+    // Someone who started ten days ago, for the best newcomer award.
+    people[9].skip = (d) => d > 10 || d % 4 === 0;
+    // One child who has never missed, and one youth who made forty in a row and then stopped coming.
+    people[0].skip = () => false;
+    people[2].skip = (d) => d <= 3;
+    // The two buddies: a first week in a row, and a first fortnight, both just reached.
+    people[4].skip = (d) => d > 7 && d % 3 === 0;
+    people[5].skip = (d) => d > 14 && d % 4 === 0;
     // Two buddies, a weekly goal, a class, something on after Fajr and a shared target.
     await db.query(`update strivers set weekly_goal = 6 where id = $1`, [self]);
     for (const pal of people.slice(4, 6)) await db.query(`insert into buddies (a, b) values ($1,$2), ($2,$1)`, [self, pal.id]);
@@ -95,8 +106,7 @@ for (const [mi, m] of MOSQUES.entries()) {
     const date = addDays(today, -d);
     const fajr = fajrWindow(timing, date).fajr.getTime();
     for (const p of people) {
-      // The demo account missed one morning three weeks ago, then kept going.
-      if (p.keen === 2 ? d === 22 : rnd() > p.keen) continue;
+      if (p.skip ? p.skip(d) : rnd() > p.keen) continue;
       const offset = Math.round((rnd() * 34 - 8) * 60);
       await db.query(
         `insert into checkins (id, striver_id, mosque_id, fajr_date, at, method, offset_sec) values ($1,$2,$3,$4,$5,$6,$7)`,
@@ -105,7 +115,85 @@ for (const [mi, m] of MOSQUES.entries()) {
     }
   }
 
+  // What each person reached, on the day they first reached it.
+  const firstSelf = mi === 0 ? people[people.length - 2].id : '';
+  for (const p of people) {
+    const got = await db.query<{ fajr_date: string }>(`select fajr_date from checkins where striver_id = $1 order by fajr_date`, [p.id]);
+    let run = 0;
+    let prev = '';
+    for (const [i, c] of got.entries()) {
+      run = prev && addDays(prev, 1) === c.fajr_date ? run + 1 : 1;
+      prev = c.fajr_date;
+      const marks: [string, number][] = [];
+      if (STREAK_MARKS.includes(run)) marks.push(['streak', run]);
+      if (TOTAL_MARKS.includes(i + 1) && i > 0) marks.push(['total', i + 1]);
+      for (const [kind, value] of marks) {
+        await db.query(`insert into milestones (id, striver_id, mosque_id, kind, value, fajr_date) values ($1,$2,$3,$4,$5,$6) on conflict do nothing`, [
+          newId(), p.id, id, kind, value, c.fajr_date,
+        ]);
+      }
+    }
+  }
+
   if (mi === 0) {
+    // Masha'Allahs: for the child who reached forty, and two waiting for the demo account.
+    const forty = await db.query<{ id: string }>(`select id from milestones where striver_id = $1 and kind = 'streak' and value = 40`, [people[0].id]);
+    for (const from of people.slice(3, 12)) if (forty[0]) await db.query(`insert into kudos (milestone_id, from_striver, seen) values ($1,$2,true)`, [forty[0].id, from.id]);
+    const mine = await db.query<{ id: string }>(`select id from milestones where striver_id = $1 and kind = 'streak' order by value desc limit 1`, [firstSelf]);
+    for (const from of people.slice(4, 6)) if (mine[0]) await db.query(`insert into kudos (milestone_id, from_striver) values ($1,$2)`, [mine[0].id, from.id]);
+    for (const pal of people.slice(4, 6)) await db.query(`insert into awake (striver_id, fajr_date, at) values ($1,$2,now())`, [pal.id, today]);
+
+    // Two more families, so the family table has something to rank.
+    const families: [string, string | null, string[], number][] = [['Idris Hashim', 'Banu Hashim', ['Hasan', 'Husain'], 0.9], ['Tariq Aziz', null, ['Anas'], 0.62]];
+    for (const [fi, [head, familyName, kids, keen]] of families.entries()) {
+      const uid = newId();
+      await db.query(`insert into users (id, email, pass_hash, name, family_name) values ($1,$2,$3,$4,$5)`, [uid, `family${fi}@demo.invalid`, await hashPassword(newId(20)), head, familyName]);
+      const members: string[] = [];
+      for (const [ki, name] of [head, ...kids.map((k) => `${k} ${head.split(' ')[1]}`)].entries()) {
+        const sid = newId();
+        members.push(sid);
+        await db.query(`insert into strivers (id, name, grp, user_id, guardian_user_id, home_mosque_id, card_code) values ($1,$2,$3,$4,$5,$6,$7)`, [
+          sid, name, ki === 0 ? 'adults' : 'kids', ki === 0 ? uid : null, ki === 0 ? null : uid, id, newId(14),
+        ]);
+      }
+      for (let d = DAYS; d >= 1; d--) {
+        const date = addDays(today, -d);
+        const fajr = fajrWindow(timing, date).fajr.getTime();
+        for (const sid of members) {
+          if (rnd() > keen) continue;
+          const offset = Math.round((rnd() * 30 - 6) * 60);
+          await db.query(`insert into checkins (id, striver_id, mosque_id, fajr_date, at, method, offset_sec) values ($1,$2,$3,$4,$5,'qr',$6)`, [
+            newId(), sid, id, date, new Date(fajr + offset * 1000), offset,
+          ]);
+        }
+      }
+    }
+
+    // The prize wish-list: one gift confirmed, one offer waiting for the admin.
+    const wishes: [string, number, string][] = [
+      ['Bicycle', 2, 'For first place among the kids and the youth'],
+      ['Medals', 40, 'One for everyone who reaches forty days'],
+      ['Breakfast on the last Friday', 1, 'For about sixty people'],
+    ];
+    for (const [wi, [title, qty, detail]] of wishes.entries()) {
+      const wid = newId();
+      await db.query(`insert into wishes (id, mosque_id, title, qty, detail, created_at) values ($1,$2,$3,$4,$5, now() + $6::interval)`, [wid, id, title, qty, detail, `${wi} seconds`]);
+      if (wi === 0) {
+        await db.query(
+          `insert into wish_pledges (id, wish_id, user_id, name, qty, email, phone, note, confirmed) values ($1,$2,$3,'Noor Cycles',1,'hello@noorcycles.example','+44 121 000 0000','One now, one for the spring challenge.',true)`,
+          [newId(), wid, userId],
+        );
+      }
+      if (wi === 2) {
+        await db.query(`insert into wish_pledges (id, wish_id, user_id, name, qty, email, note) values ($1,$2,$3,'Baraka Bakery',1,'hello@barakabakery.example','We can bring it at 6:30.')`, [newId(), wid, userId]);
+      }
+    }
+
+    // Someone asking to be excused, waiting for the admin's answer.
+    await db.query(`insert into excuse_requests (id, striver_id, mosque_id, from_date, to_date, reason) values ($1,$2,$3,$4,$5,'Visiting family in Leeds')`, [
+      newId(), people[8].id, id, addDays(today, 1), addDays(today, 3),
+    ]);
+
     const ch = newId(10);
     await db.query(`insert into challenges (id, scope_type, scope_id, name, start_date, end_date, count_away, rules) values ($1,'mosque',$2,$3,$4,$5,true,$6)`, [
       ch, id, '40 Days of Fajr', addDays(today, -26), addDays(today, 13), 'Prizes are handed out after Jumu‘ah on the last Friday.',
@@ -145,6 +233,14 @@ for (const [name, city, country, kinds, note, forHome] of offers) {
     `insert into sponsors (id, user_id, name, email, phone, country, city, kinds, note, scope, mosque_id) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [newId(), userId, name, `hello@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`, '+44 121 000 0000', country, city, JSON.stringify(kinds), note, forHome ? 'mosque' : 'country', forHome ? homeId : null],
   );
+}
+// A friendly match between the two UK mosques, three days in.
+{
+  const [leicester] = await db.query<{ id: string }>(`select id from mosques where city = 'Leicester'`);
+  const t = localDate(now, 'Europe/London');
+  await db.query(`insert into matches (id, a_mosque, b_mosque, start_date, end_date, status, created_by) values ($1,$2,$3,$4,$5,'accepted',$6)`, [
+    newId(10), homeId, leicester.id, addDays(t, -3), addDays(t, 3), userId,
+  ]);
 }
 await db.close();
 console.log(`\nDemo account: ${demoEmail} / ${demoPassword}\nIts home mosque is ${MOSQUES[0].name} (${homeId}).`);

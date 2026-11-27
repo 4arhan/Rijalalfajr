@@ -15,7 +15,7 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 - Printed member cards a volunteer can scan, and a parent checking in their children on the same scan.
 - Open only around Fajr: from shortly before the adhan until sunrise, worked out from the mosque's location, or from the Fajr and iqamah times the mosque enters itself.
 - One check-in per person per Fajr, at any registered mosque.
-- A mosque can excuse a member's day (illness, travel) so it does not break a streak.
+- A mosque can excuse a member's day (illness, travel) so it does not break a streak. A member can also ask from the app, with a reason, and staff approve in one tap.
 
 **Competition**
 - A podium (1st, 2nd, 3rd) and leaderboard at each mosque, by week, month and all time, for everyone or by group.
@@ -25,14 +25,18 @@ Check in for Fajr at your mosque, keep your streak, win your mosque's podium, an
 - Squads of up to 10 friends inside a mosque.
 - Organisations that group several mosques under one leaderboard, with their own challenges and prizes.
 - A world leaderboard of approved mosques, by total check-ins or by consistency, added up by city and by country, with worldwide seasons the owner starts.
+- Weekly awards for the last finished week: most consistent, most improved and best newcomer, for the people at each mosque and for mosques across the world.
+- Families (a parent and children on one account) ranked together by days per member, with a family of the month.
+- A friendly match between two mosques for one week, scored by the share of each mosque's members at Fajr.
+- A roll of honour at each mosque for everyone who reaches forty dawns in a row. The name stays.
 
-**For each person**: streaks, a weekly goal, a calendar, ten badges, family members, a star chart for children, Fajr buddies with nudges, invitation links, a year in review, share cards, light and dark mode, hiding your name, deleting your account.
+**For each person**: streaks, a weekly goal, a calendar, ten badges, family members, a star chart for children, Fajr buddies with nudges, invitation links, a year in review, share cards, light and dark mode, hiding your name, deleting your account. Also: an "I'm awake" tap before Fajr that buddies and squad-mates see, milestones on the mosque's page that others can say Masha'Allah to, "my patterns" (the weekday you miss most, and whether you arrive earlier than last month), and a guide to adding the app to the home screen on iPhone and Android.
 
 **Sharing**: a mosque's page opens from a link without an account (names shown as a first name and an initial; a mosque can turn this off), a leaderboard to embed on the mosque's website, and a weekly poster image.
 
-**For mosque staff**: the mosque screen, attendance list, poster and cards to print, events after Fajr with a count of who is staying, a 14-day chart, CSV export, sponsor offers, admins and volunteers, practice mode.
+**For mosque staff**: the mosque screen, attendance list, poster and cards to print, events after Fajr with a count of who is staying, a 14-day chart, CSV export, sponsor offers, admins and volunteers, practice mode. Also: "Who haven't we seen?" (regulars who have missed three dawns or more), requests to be excused, and adding many names at once by pasting from a spreadsheet or choosing a CSV file.
 
-**Sponsors**: anyone can offer to sponsor, choose how (prizes, breakfast, funds, vouchers), and choose who may contact them: every mosque in their country, or one mosque. Only mosque and organisation admins see their contact details.
+**Sponsors**: anyone can offer to sponsor, choose how (prizes, breakfast, funds, vouchers), and choose who may contact them: every mosque in their country, or one mosque. Only mosque and organisation admins see their contact details. A mosque can also keep a prize wish-list ("2 bicycles"): a sponsor offers an item, and once the admin confirms the gift their name is thanked on the mosque's page, its challenges and the mosque screen.
 
 **For the owner**: approve mosques for the world leaderboard, suspend a mosque, start seasons, handle reports, remove sponsor offers.
 
@@ -58,6 +62,8 @@ npm run dev      # app on http://localhost:5173, API on http://localhost:8787
 With no `DATABASE_URL`, data is kept in an embedded Postgres under `.data/`, so there is nothing else to install.
 
 The seed creates a demo account: `demo@rijalalfajr.app` / `fajr-demo-1`. To give it the owner console, start the server with `OWNER_EMAILS=demo@rijalalfajr.app`.
+
+Check-in and the "I'm awake" button only open around Fajr. To see the demo as it looks at dawn at any hour, start the local server with a pretend time, a few minutes after Fajr at the demo mosque: `DEMO_NOW=2026-11-27T05:58:00Z npm start` (use today's date).
 
 To try check-in outside Fajr hours, turn on **Practice mode** in the mosque's settings.
 
@@ -85,7 +91,7 @@ Steps:
 3. Under **Settings → Environment Variables**, add `OWNER_EMAILS` with your email.
 4. Redeploy.
 
-Without a database the site still opens, and the app says it is not connected yet. The Vercel setup has not been deployed yet, so treat the first deployment as a test.
+Without a database the site still opens, and the app says it is not connected yet. `/api/health` answers `{"ok":true}` once the database is reached; until then it says which build is running and whether a database address reached it.
 
 ## How it is put together
 
@@ -94,9 +100,9 @@ Without a database the site still opens, and the app says it is not connected ye
 | `server/app.ts` | Every API route |
 | `server/fajr.ts` | Fajr time, the check-in window, distance |
 | `server/security.ts` | Passwords, sessions, the signed QR codes |
-| `server/board.ts` | Streaks, ranking, badges |
+| `server/board.ts` | Streaks, ranking, badges, milestones, weekly awards, attendance patterns |
 | `server/db.ts` | The schema and the two database drivers |
-| `src/pages/` | One file per screen |
+| `src/pages/` | One file per screen (`Social.tsx` and `Staff.tsx` hold the community and staff features) |
 | `src/ui.tsx` | Shared pieces: session, podium, QR display, camera scanner |
 | `src/lib/i18n.tsx` | The language list and the translation functions |
 | `src/locales/`, `about/locales/` | One file per language |

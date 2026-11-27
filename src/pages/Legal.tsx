@@ -14,6 +14,9 @@ export function RulesPage() {
         <p className="small">{t('Check in only when you are at the mosque for Fajr, and only for yourself and your own family. Mosque admins can remove a check-in that was made by mistake or dishonestly, and the app owner can suspend a mosque that abuses the leaderboard.')}</p>
         <h3>{t('Excused days')}</h3>
         <p className="small">{t('A mosque admin or volunteer can excuse a member for a day, for illness or travel. An excused day does not break a streak, and it does not count as a day attended.')}</p>
+        <p className="small">{t('You can also ask from Me for days to be excused, with a reason. Your mosque decides.')}</p>
+        <h3>{t('The roll of honour')}</h3>
+        <p className="small">{t('Forty dawns in a row at the mosque puts your name on your mosque’s roll of honour, and it stays there. If you hide your name, it shows as “Anonymous striver”.')}</p>
         <h3>{t('Prizes')}</h3>
         <p className="small">{t('Any prize is offered, funded and handed out by the mosque or organisation that announced it. Rijal al-Fajr only shows the prize and the standings. There is nothing to buy and no entry fee. Apple and Google are not sponsors and are not involved in any way.')}</p>
         <h3>{t('Intention')}</h3>
@@ -34,6 +37,8 @@ export function PrivacyPage() {
         <p className="small">{t('When you check in from a printed poster we ask for your location once, to confirm you are at the mosque. We keep the distance in metres with the check-in. We do not keep where you were and we never track you.')}</p>
         <h3>{t('Who sees what')}</h3>
         <p className="small">{t('Signed-in people see your display name, days attended and streak on your mosque\'s leaderboard. Anyone with the link to a mosque\'s page can see its podium without an account, with names cut to a first name and an initial; a mosque can turn that off. You can hide your name everywhere. Your buddies see whether you checked in today and your streak. Mosque staff see who checked in at their mosque. The world leaderboard shows only totals.')}</p>
+        <p className="small">{t('Milestones you reach, such as a week in a row, show on your mosque’s page unless you hide your name. If you tap “I’m awake”, your buddies and squad see it for a few hours. A reason you give when asking to be excused is seen only by your mosque’s staff, who can also see which regulars have stopped coming. Your patterns are shown only to you.')}</p>
+        <p className="small">{t('If you offer an item from a mosque’s wish-list, that mosque’s admins see your contact details, and the name you gave is shown publicly once they confirm the gift.')}</p>
         <h3>{t('What we do not do')}</h3>
         <p className="small">{t('No ads. No selling or sharing of your data. No tracking across other apps or sites.')}</p>
         <h3>{t('Deleting your data')}</h3>

@@ -52,7 +52,7 @@ export interface Striver {
   weeklyGoal: number;
 }
 export interface Me {
-  user: { id: string; email: string; name: string; owner: boolean; inviteCode: string };
+  user: { id: string; email: string; name: string; owner: boolean; inviteCode: string; familyName: string | null };
   strivers: Striver[];
   staff: { id: string; name: string; role: 'admin' | 'volunteer' }[];
   orgs: { id: string; name: string }[];
@@ -116,7 +116,37 @@ export interface Pledge {
   sponsor: string;
   progress: number;
 }
+/** Something the mosque would like for its prizes, and who has given it. */
+export interface Wish {
+  id: string;
+  title: string;
+  qty: number;
+  detail: string;
+  given: number;
+  mine: boolean;
+  givenBy: string[];
+}
+export interface MatchSide {
+  id: string;
+  name: string;
+  city: string;
+  members: number;
+  checkins: number;
+  share: number;
+}
+export interface Match {
+  id: string;
+  startDate: string;
+  endDate: string;
+  a: MatchSide;
+  b: MatchSide;
+  status: 'invited' | 'upcoming' | 'active' | 'ended';
+  toAnswer: boolean;
+}
 export interface MosquePage {
+  wishes: Wish[];
+  thanks: string[];
+  matches: Match[];
   events: MosqueEvent[];
   pledges: Pledge[];
   mosque: Mosque;
@@ -155,7 +185,15 @@ export interface Badge {
   progress: number;
   goal: number;
 }
+export interface Patterns {
+  days: number;
+  weekdays: { came: number; of: number }[];
+  hardest: number | null;
+  strongest: number | null;
+  arrival: { now: number; before: number | null; samples: number } | null;
+}
 export interface Stats {
+  patterns: Patterns | null;
   striver: { id: string; name: string; grp: Group };
   today: string;
   total: number;
@@ -172,4 +210,56 @@ export interface Stats {
   ranked: number;
   home: { id: string; name: string } | null;
   badges: Badge[];
+}
+
+export interface FeedItem {
+  id: string;
+  striverId: string;
+  name: string;
+  kind: 'streak' | 'total';
+  value: number;
+  date: string;
+  kudos: number;
+  mine: boolean;
+  own: boolean;
+}
+export interface FamilyRow {
+  id: string;
+  name: string | null;
+  first: string | null;
+  members: number;
+  days: number;
+  perMember: number;
+  mine: boolean;
+}
+export interface Award {
+  kind: 'consistent' | 'improved' | 'newcomer';
+  striverId: string;
+  name: string;
+  days: number;
+  prev: number;
+}
+export interface Community {
+  hidden: boolean;
+  feed: FeedItem[];
+  honour: { striverId: string; name: string; date: string; top: number }[];
+  families: FamilyRow[];
+  familyOfMonth: { month: string; family: FamilyRow } | null;
+  awards: Award[];
+  week: { from: string; to: string };
+}
+export interface Pulse {
+  awake: { date: string; canTap: boolean; mine: boolean; up: string[]; mosqueCount: number } | null;
+  cheers: { milestoneId: string; kind: 'streak' | 'total'; value: number; owner: string | null; names: string[]; count: number }[];
+  toCheer: { id: string; striverId: string; name: string; kind: 'streak' | 'total'; value: number; date: string }[];
+}
+export interface ExcuseRequest {
+  id: string;
+  striverId: string;
+  name: string;
+  mosque: string;
+  fromDate: string;
+  toDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'declined';
 }

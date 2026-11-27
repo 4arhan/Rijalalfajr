@@ -1,13 +1,36 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Award, BellRing, BookOpen, Check, HeartHandshake, Landmark, MoonStar, Target, Trophy, Users } from 'lucide-react';
-import { api, type MosquePage as MosqueData, type Stats } from '../api';
-import { Eyebrow, Loading, Problem, Ring, Screen, useMe } from '../ui';
-import { HADITH, addDays, hijri, plural, timeIn, untilText, useLoad, useNow } from '../lib/util';
+import { ArrowRight, Award, BellRing, BookOpen, Check, HeartHandshake, Landmark, MoonStar, Sun, Sunrise, Target, Trophy, Users } from 'lucide-react';
+import { api, type MosquePage as MosqueData, type Pulse, type Stats } from '../api';
+import { Avatar, CountUp, Eyebrow, Problem, Ring, Screen, Skeleton, useMe } from '../ui';
+import { HADITH, addDays, hijri, skyPhase, timeIn, untilText, useLoad, useNow } from '../lib/util';
 import { EventList, PledgeList } from './Community';
 import type { BuddyData } from './Personal';
-import { currentLang, t, tn, tx } from '../lib/i18n';
+import { AwakeCard, CheerList, CheersNote, InstallCard, MatchCard } from './Social';
+import { currentLang, dateLocale, t, tn, tx } from '../lib/i18n';
 
 const MILESTONES = [3, 7, 14, 21, 40, 100, 200, 365];
+
+/** The last seven dawns, today last: prayed at the mosque, excused, missed or still to come. */
+function WeekStrip({ stats }: { stats: Stats }) {
+  const on = new Set(stats.dates);
+  const excused = new Set(stats.excused);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(stats.today, i - 6));
+  const letter = new Intl.DateTimeFormat(dateLocale(), { weekday: 'narrow', timeZone: 'UTC' });
+  return (
+    <div className="week" role="img" aria-label={tn(days.filter((d) => on.has(d)).length, '{n} of the last 7 dawns at the mosque', '{n} of the last 7 dawns at the mosque')}>
+      {days.map((d) => {
+        const [y, m, day] = d.split('-').map(Number);
+        const state = on.has(d) ? 'on' : excused.has(d) ? 'ex' : d === stats.today ? 'now' : 'off';
+        return (
+          <div key={d} className={state}>
+            <span>{letter.format(new Date(Date.UTC(y, m - 1, day)))}</span>
+            <i>{state === 'on' ? <Check size={15} strokeWidth={3} /> : day}</i>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function TodayPage() {
   const me = useMe();
@@ -15,18 +38,19 @@ export function TodayPage() {
   const family = me.strivers.filter((s) => !s.self);
   const now = useNow();
   const { data, error, reload } = useLoad(async () => {
-    const [stats, home, fam, pals] = await Promise.all([
+    const [stats, home, fam, pals, pulse] = await Promise.all([
       api<Stats>(`/strivers/${self.id}/stats`),
       self.homeMosqueId ? api<MosqueData>(`/mosques/${self.homeMosqueId}`) : null,
       Promise.all(family.map((f) => api<Stats>(`/strivers/${f.id}/stats`))),
       api<BuddyData>('/buddies'),
+      api<Pulse>('/pulse').catch(() => null),
     ]);
-    return { stats, home, fam, pals };
+    return { stats, home, fam, pals, pulse };
   }, [self.id, self.homeMosqueId, family.length]);
 
   if (error) return <Screen title={t('Today')}><Problem error={error} retry={reload} /></Screen>;
-  if (!data) return <Screen title={t('Today')}><Loading /></Screen>;
-  const { stats, home, fam, pals } = data;
+  if (!data) return <Screen title={t('Today')} eyebrow={hijri(now)}><Skeleton cards={3} /></Screen>;
+  const { stats, home, fam, pals, pulse } = data;
   // A challenge that finished in the last two weeks is announced here.
   const finished = home?.challenges.find((c) => c.status === 'ended' && c.endDate >= addDays(stats.today, -14));
   const week = Array.from({ length: 7 }, (_, i) => addDays(stats.today, i - 6));
@@ -37,16 +61,19 @@ export function TodayPage() {
   const active = home?.challenges.filter((c) => c.status === 'active') ?? [];
   // The mosque's own challenge comes before its organisation's.
   const challenge = active.find((c) => c.scopeType === 'mosque') ?? active[0];
+  const sky = skyPhase(win, tz, now);
+  const match = home?.matches.find((m) => m.status === 'active') ?? home?.matches.find((m) => m.status === 'upcoming');
 
   return (
     <Screen title={t('Today')} eyebrow={hijri(now)}>
-      <section className="hero">
-        <Eyebrow icon={<MoonStar size={15} />}>{stats.doneToday ? t('Fajr prayed at the mosque') : t('Your dawn streak')}</Eyebrow>
+      <section className={`hero sky sky-${sky}`}>
+        <div className="sky-art" aria-hidden="true"><i className="stars" /><i className="orb" /></div>
+        <Eyebrow icon={sky === 'night' ? <MoonStar size={15} /> : sky === 'dawn' ? <Sunrise size={15} /> : <Sun size={15} />}>{t('As-salamu alaykum, {name}', { name: self.name.split(' ')[0] })}</Eyebrow>
         <div className="between" style={{ marginTop: 12 }}>
           <div>
-            <div className="big num">
-              {stats.streak}
-              <small>{stats.streak === 1 ? t('day') : t('days')}</small>
+            <div className={`big num${stats.streak >= 7 ? ' lit' : ''}`}>
+              <CountUp value={stats.streak} />
+              <small>{stats.streak === 1 ? t('day in a row') : t('days in a row')}</small>
             </div>
             <p className="muted" style={{ marginTop: 8 }}>
               {stats.doneToday
@@ -63,13 +90,14 @@ export function TodayPage() {
             </div>
           </Ring>
         </div>
+        <WeekStrip stats={stats} />
         <div className="stats">
           <div><label>{t('Best streak')}</label><b className="num">{stats.best}</b></div>
           <div><label>{t('All dawns')}</label><b className="num">{stats.total}</b></div>
           <div><label>{t('Mosque rank')}</label><b className="num">{stats.rank ? `#${stats.rank}` : '–'}</b></div>
         </div>
         {stats.doneToday ? (
-          <div className="cta" style={{ cursor: 'default' }}>
+          <div className="cta done" style={{ cursor: 'default' }}>
             <span>
               <small>{t('Today')}</small>
               <b>{t('Checked in. May Allah accept it.')}</b>
@@ -77,7 +105,7 @@ export function TodayPage() {
             <i><Check size={20} /></i>
           </div>
         ) : (
-          <Link className="cta" to="/checkin">
+          <Link className={`cta${win?.open ? ' live' : ''}`} to="/checkin">
             <span>
               <small>
                 {win ? (win.inWindow ? t('Open until {time}', { time: timeIn(win.closes, tz) }) : t('Fajr {time} · in {wait}', { time: timeIn(win.fajr, tz), wait: untilText(win.fajr, now) })) : t('Check in')}
@@ -89,12 +117,15 @@ export function TodayPage() {
         )}
       </section>
 
+      {!stats.doneToday && pulse && <AwakeCard awake={pulse.awake} onChange={reload} />}
+
       {pals.nudges.length > 0 && (
         <div className="note between">
           <span className="row"><BellRing size={18} /> <span>{tx('<b>{names}</b> nudged you: see you at Fajr.', { names: pals.nudges.map((n) => n.name.split(' ')[0]).join(', ') })}</span></span>
           <button className="btn soft sm" onClick={async () => { await api('/nudges/seen', { method: 'POST' }); reload(); }}>{t('OK')}</button>
         </div>
       )}
+      {pulse && <CheersNote cheers={pulse.cheers} onSeen={reload} />}
 
       {stats.weeklyGoal > 0 && (
         <section className="card">
@@ -110,8 +141,8 @@ export function TodayPage() {
       )}
 
       {finished && (
-        <Link to={`/challenge/${finished.id}`} className="card row" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="icon"><Award size={20} /></span>
+        <Link to={`/challenge/${finished.id}`} className="card row tap">
+          <span className="icon gold"><Award size={20} /></span>
           <span className="grow">
             <span className="eyebrow">{t('The results are in')}</span>
             <b className="truncate" style={{ display: 'block' }}>{t('{name}: see the winners', { name: finished.name })}</b>
@@ -127,7 +158,11 @@ export function TodayPage() {
             <h2 className="truncate">{home.mosque.name}</h2>
             <Link to="/mosque" className="btn soft sm">{t('Leaderboard')}</Link>
           </div>
-          <p className="muted small" style={{ margin: '4px 0 12px' }}>{t('Fajr {fajr} · Iqamah {iqamah} · Sunrise {sunrise}', { fajr: timeIn(home.window.fajr, tz), iqamah: timeIn(home.window.iqamah, tz), sunrise: timeIn(home.window.sunrise, tz) })}</p>
+          <div className="times">
+            <div><small>{t('Fajr')}</small><b className="num">{timeIn(home.window.fajr, tz)}</b></div>
+            <div><small>{t('Iqamah')}</small><b className="num">{timeIn(home.window.iqamah, tz)}</b></div>
+            <div><small>{t('Sunrise')}</small><b className="num">{timeIn(home.window.sunrise, tz)}</b></div>
+          </div>
           <div className="between small" style={{ marginBottom: 6 }}>
             <b>{tn(home.todayCount, '{n} person at Fajr today', '{n} people at Fajr today')}</b>
             {home.mosque.dailyGoal > 0 && <span className="muted">{t('Goal {dailyGoal}', { dailyGoal: home.mosque.dailyGoal })}</span>}
@@ -143,18 +178,20 @@ export function TodayPage() {
         </section>
       ) : (
         <section className="card empty">
+          <span className="empty-icon"><Landmark size={24} /></span>
           <b>{t('Choose your mosque')}</b>
           {t('Your Fajr counts wherever you pray. Your home mosque is where you appear on the leaderboard.')}
           <div><Link className="btn" to="/find">{t('Find my mosque')}</Link></div>
         </section>
       )}
 
+      {home && match && <MatchCard match={match} home={home.mosque.id} />}
       {home && <PledgeList pledges={home.pledges} admin={false} onChange={reload} />}
       {home && <EventList events={home.events} signedIn staff={false} onChange={reload} />}
 
       {challenge && (
-        <Link to={`/challenge/${challenge.id}`} className="card row" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <span className="icon"><Trophy size={20} /></span>
+        <Link to={`/challenge/${challenge.id}`} className="card row tap">
+          <span className="icon gold"><Trophy size={20} /></span>
           <span className="grow">
             <span className="eyebrow">{t('Challenge on now')}</span>
             <b className="truncate" style={{ display: 'block' }}>{challenge.name}</b>
@@ -162,6 +199,8 @@ export function TodayPage() {
           <ArrowRight size={18} className="muted" />
         </Link>
       )}
+
+      {pulse && <CheerList items={pulse.toCheer} onChange={reload} />}
 
       {fam.length > 0 && (
         <section className="card">
@@ -190,9 +229,12 @@ export function TodayPage() {
           <div className="list">
             {pals.buddies.slice(0, 3).map((b) => (
               <div className="item" key={b.striverId}>
-                <span className={`check${b.doneToday ? ' on' : ''}`}><Check size={16} /></span>
-                <span className="grow"><b>{b.name}</b></span>
-                <span className="sub num">{`${b.doneToday ? t('At Fajr today') : t('Not yet today')} · ${tn(b.streak, '{n} day in a row', '{n} days in a row')}`}</span>
+                <Avatar name={b.name} />
+                <span className="grow">
+                  <b className="truncate" style={{ display: 'block' }}>{b.name}</b>
+                  <span className="sub num">{tn(b.streak, '{n} day in a row', '{n} days in a row')}</span>
+                </span>
+                {b.doneToday ? <span className="pill"><Check size={13} /> {t('At Fajr today')}</span> : b.awake ? <span className="pill gold"><Sun size={13} /> {t('Awake')}</span> : <span className="pill grey">{t('Not yet today')}</span>}
               </div>
             ))}
           </div>
@@ -202,11 +244,13 @@ export function TodayPage() {
       </section>
 
       {/* Hadith wording is shown in English only until each translation has been checked by someone qualified. */}
-      {currentLang() === 'en' && <section className="card">
+      {currentLang() === 'en' && <section className="card quote">
         <Eyebrow icon={<BookOpen size={15} />}>{t('Why Fajr')}</Eyebrow>
         <p style={{ fontSize: 17, lineHeight: 1.5 }}>{hadith.text}</p>
         <p className="muted small" style={{ marginTop: 8 }}>{hadith.source}</p>
       </section>}
+
+      <InstallCard />
     </Screen>
   );
 }

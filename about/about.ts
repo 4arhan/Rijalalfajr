@@ -1,9 +1,9 @@
 import '@fontsource-variable/manrope';
 import './about.css';
 import {
-  createIcons, Award, Baby, BadgeCheck, CalendarRange, ChartColumn, ClipboardCheck, ClipboardList, Clock, Coffee, EyeOff, FlaskConical, Gift, Globe,
-  GraduationCap, HandHeart, HeartHandshake, IdCard, Image as ImageIcon, Languages, MapPin, Medal, Network, Printer, QrCode, ScanLine, Send, Share2, ShieldCheck,
-  Sparkles, Star, Sunrise, Target, Trophy, Users, UsersRound, WifiOff,
+  createIcons, Activity, Award, Baby, BadgeCheck, CalendarOff, CalendarRange, ChartColumn, ClipboardCheck, ClipboardList, Clock, Coffee, Crown, EyeOff, FileUp, FlaskConical, Gift, Globe,
+  GraduationCap, HandHeart, Heart, HeartHandshake, IdCard, Image as ImageIcon, Languages, MapPin, Medal, Network, Printer, QrCode, ScanLine, Send, Share2, ShieldCheck,
+  Smartphone, Sparkles, Star, Sun, Sunrise, Swords, Target, Trophy, Users, UsersRound, WifiOff,
 } from 'lucide';
 
 document.documentElement.classList.add('js');
@@ -107,9 +107,9 @@ if (lang !== 'en' && files[`./locales/${lang}.json`]) {
 createIcons({
   attrs: { 'stroke-width': '1.9', 'aria-hidden': 'true' },
   icons: {
-    Award, Baby, BadgeCheck, CalendarRange, ChartColumn, ClipboardCheck, ClipboardList, Clock, Coffee, EyeOff, FlaskConical, Gift, Globe, GraduationCap,
-    HandHeart, HeartHandshake, IdCard, Image: ImageIcon, Languages, MapPin, Medal, Network, Printer, QrCode, ScanLine, Send, Share2, ShieldCheck, Sparkles,
-    Star, Sunrise, Target, Trophy, Users, UsersRound, WifiOff,
+    Activity, Award, Baby, BadgeCheck, CalendarOff, CalendarRange, ChartColumn, ClipboardCheck, ClipboardList, Clock, Coffee, Crown, EyeOff, FileUp, FlaskConical, Gift, Globe,
+    GraduationCap, HandHeart, Heart, HeartHandshake, IdCard, Image: ImageIcon, Languages, MapPin, Medal, Network, Printer, QrCode, ScanLine, Send, Share2, ShieldCheck,
+    Smartphone, Sparkles, Star, Sun, Sunrise, Swords, Target, Trophy, Users, UsersRound, WifiOff,
   },
 });
 

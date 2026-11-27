@@ -1,24 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { BarChart3, Check, ClipboardList, CalendarPlus, Download, GraduationCap, HandHeart, ImageDown, Share2, Target, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, WifiOff, X } from 'lucide-react';
+import { BarChart3, Check, ClipboardList, CalendarPlus, Download, FileUp, Gift, GraduationCap, HandHeart, HeartHandshake, ImageDown, Share2, Swords, Target, Monitor, Plus, Printer, QrCode, ScanLine, Settings2, Sunrise, Trophy, UserPlus, WifiOff, X } from 'lucide-react';
 import { api, ApiError, GROUPS, type Group, type MosquePage as MosqueData, type Standing, type Win } from '../api';
 import { keepTick, pendingTicks, saveList, savedList, sendTicks } from '../lib/offline';
-import { Eyebrow, Field, LinkRow, Loading, Problem, Qr, Scanner, Screen, Seg, Sheet, useAction, useToast } from '../ui';
+import { CountUp, Empty, Eyebrow, Field, LinkRow, Loading, Problem, Qr, Scanner, Screen, Seg, Sheet, Skeleton, useAction, useToast } from '../ui';
 import { addDays, niceDate, plural, timeIn, useLoad, groupName } from '../lib/util';
 import { EmbedSheet, EventList, EventSheet, PledgeList, PledgeSheet } from './Community';
 import { sharePoster } from '../lib/share';
+import { MatchSheet, MatchesCard, RequestsCard } from './Staff';
 import { t, tn, tx } from '../lib/i18n';
 
-interface StatsData { today: string; days: { date: string; count: number; byPhone: number }[]; members: number; visitors: number; flags: { fajr_date: string; n: number }[] }
+interface StatsData {
+  today: string; days: { date: string; count: number; byPhone: number }[]; members: number; visitors: number; flags: { fajr_date: string; n: number }[];
+  missing: number; pendingExcuses: number; matchInvites: number; wishOffers: number;
+}
 
 export function ManagePage() {
   const { id } = useParams();
   const toast = useToast();
   const page = useLoad(() => api<MosqueData>(`/mosques/${id}`), [id]);
   const stats = useLoad(() => api<StatsData>(`/mosques/${id}/stats`), [id]);
-  const [sheet, setSheet] = useState<'event' | 'pledge' | 'embed' | null>(null);
+  const [sheet, setSheet] = useState<'event' | 'pledge' | 'embed' | 'match' | null>(null);
+  const [matchTick, setMatchTick] = useState(0);
   if (page.error || stats.error) return <Screen title={t('Manage')} back="/me"><Problem error={(page.error ?? stats.error)!} retry={() => { page.reload(); stats.reload(); }} /></Screen>;
-  if (!page.data || !stats.data) return <Screen title={t('Manage')} back="/me"><Loading /></Screen>;
+  if (!page.data || !stats.data) return <Screen title={t('Manage')} back="/me"><Skeleton cards={3} /></Screen>;
   const { mosque, window: win } = page.data;
   const admin = page.data.role === 'admin';
   const max = Math.max(1, ...stats.data.days.map((d) => d.count));
@@ -62,7 +67,7 @@ export function ManagePage() {
       action={admin && <Link className="iconbtn" to={`/manage/${id}/settings`} aria-label={t('Mosque settings')}><Settings2 size={19} /></Link>}>
       <section className="hero">
         <Eyebrow icon={<Sunrise size={15} />}>{win.inWindow ? t('Check-in open until {time}', { time: timeIn(win.closes, mosque.timezone) }) : t('Next Fajr {time}', { time: timeIn(win.fajr, mosque.timezone) })}</Eyebrow>
-        <div className="big num" style={{ marginTop: 12 }}>{page.data.todayCount}<small>{t('at Fajr today')}</small></div>
+        <div className="big num" style={{ marginTop: 12 }}><CountUp value={page.data.todayCount} /><small>{t('at Fajr today')}</small></div>
         {mosque.dailyGoal > 0 && <div className="meter" style={{ marginTop: 12 }}><i style={{ width: `${Math.min(100, (page.data.todayCount / mosque.dailyGoal) * 100)}%` }} /></div>}
         <div className="stats">
           <div><label>{t('Members')}</label><b className="num">{stats.data.members}</b></div>
@@ -81,10 +86,19 @@ export function ManagePage() {
         <div className="note err" key={f.fajr_date}>{t('On {date}, {n} different accounts checked in from one phone. Have a look at that day\'s list.', { date: niceDate(f.fajr_date), n: f.n })}</div>
       ))}
 
+      <RequestsCard mosqueId={id!} onChange={stats.reload} />
+      <MatchesCard mosqueId={id!} admin={admin} tick={matchTick} />
+
       <section className="card tight">
         <LinkRow to={`/manage/${id}/list`} icon={<ClipboardList size={19} />} title={t('Attendance list')} sub={t('Tick children and anyone without a phone')} />
+        <LinkRow to={`/manage/${id}/missing`} icon={<HeartHandshake size={19} />} title={t('Who haven’t we seen?')}
+          sub={stats.data.missing ? tn(stats.data.missing, '{n} regular has missed three dawns or more', '{n} regulars have missed three dawns or more') : t('Regulars who have stopped coming')}
+          end={stats.data.missing ? <span className="pill gold num">{stats.data.missing}</span> : undefined} />
         <LinkRow to={`/manage/${id}/print`} icon={<Printer size={19} />} title={t('Poster and member cards')} sub={t('Print a QR poster, and a card for each child')} />
         {admin && <LinkRow to={`/manage/${id}/sponsors`} icon={<HandHeart size={19} />} title={t('Sponsors')} sub={t('People offering prizes, breakfast or funds')} />}
+        {admin && <LinkRow to={`/manage/${id}/wishes`} icon={<Gift size={19} />} title={t('Prize wish-list')}
+          sub={stats.data.wishOffers ? tn(stats.data.wishOffers, '{n} offer waiting for your answer', '{n} offers waiting for your answer') : t('Say what you need, and let sponsors give it')}
+          end={stats.data.wishOffers ? <span className="pill gold num">{stats.data.wishOffers}</span> : undefined} />}
         {admin && <LinkRow to={`/challenge/new?scope=mosque:${id}`} icon={<Trophy size={19} />} title={t('New challenge')} sub={t('Set the dates and the prizes')} />}
         <button className="item" onClick={exportCsv}>
           <span className="icon"><Download size={19} /></span>
@@ -99,6 +113,12 @@ export function ManagePage() {
           <span className="icon"><CalendarPlus size={19} /></span>
           <span className="grow"><b>{t('After Fajr')}</b><span className="sub" style={{ display: 'block' }}>{t('Post breakfast, a halaqah or football')}</span></span>
         </button>
+        {admin && (
+          <button className="item" onClick={() => setSheet('match')}>
+            <span className="icon"><Swords size={19} /></span>
+            <span className="grow"><b>{t('Friendly match')}</b><span className="sub" style={{ display: 'block' }}>{t('One week against another mosque')}</span></span>
+          </button>
+        )}
         {admin && (
           <button className="item" onClick={() => setSheet('pledge')}>
             <span className="icon"><Target size={19} /></span>
@@ -120,6 +140,7 @@ export function ManagePage() {
       {sheet === 'event' && <EventSheet mosqueId={id!} today={win.today} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); page.reload(); toast(t('Posted')); }} />}
       {sheet === 'pledge' && <PledgeSheet mosqueId={id!} today={win.today} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); page.reload(); toast(t('Target set')); }} />}
       {sheet === 'embed' && <EmbedSheet mosqueId={id!} onClose={() => setSheet(null)} />}
+      {sheet === 'match' && <MatchSheet mosque={mosque} today={win.today} onClose={() => setSheet(null)} onSent={() => { setSheet(null); setMatchTick((n) => n + 1); toast(t('Invitation sent')); }} />}
 
       <section className="card">
         <div className="between" style={{ marginBottom: 12 }}>
@@ -325,7 +346,7 @@ export function AttendancePage() {
             ))}
           </div>
         ) : (
-          <div className="empty"><b>{shown.length ? t('No one matches') : t('The list is empty')}</b>{t('Add children and anyone without a phone. People with the app appear here once this is their home mosque.')}</div>
+          <Empty icon={<ClipboardList size={24} />} title={shown.length ? t('No one matches') : t('The list is empty')}>{t('Add children and anyone without a phone. People with the app appear here once this is their home mosque.')}</Empty>
         )}
       </section>
       {data && typed.length >= 2 && !known && people.length > 0 && (
@@ -335,6 +356,7 @@ export function AttendancePage() {
         </p>
       )}
       <p className="muted small">{t('Excuse a member for illness or travel and the day does not break their streak. It does not count as a day attended.')}</p>
+      <Link className="btn ghost" to={`/manage/${id}/import`}><FileUp size={18} />{' '}{t('Add many names from a spreadsheet')}</Link>
       {sheet === 'add' && <AddPerson mosqueId={id!} onClose={() => setSheet(null)} onAdded={() => { setSheet(null); reload(); }} />}
       {sheet === 'scan' && <CardScan mosqueId={id!} date={data?.date} onClose={() => { setSheet(null); reload(); }} />}
     </Screen>
@@ -371,7 +393,7 @@ function CardScan({ mosqueId, date, onClose }: { mosqueId: string; date?: string
   const onCode = async (text: string) => {
     try {
       const r = await api<{ striver: { name: string }; fresh: boolean }>(`/mosques/${mosqueId}/mark`, { body: { cardCode: text, date } });
-      setLog((l) => [{ ok: true, text: r.fresh ? `${r.striver.name} is checked in` : `${r.striver.name} was already checked in` }, ...l].slice(0, 5));
+      setLog((l) => [{ ok: true, text: r.fresh ? t('{name} is checked in', { name: r.striver.name }) : t('{name} was already checked in', { name: r.striver.name }) }, ...l].slice(0, 5));
     } catch (e) {
       setLog((l) => [{ ok: false, text: (e as Error).message }, ...l].slice(0, 5));
     }
@@ -398,6 +420,7 @@ interface ScreenData {
   todayCount: number;
   recent: { name: string; at: string }[];
   top: Standing[];
+  thanks?: string[];
 }
 
 export function ScreenPage() {
@@ -462,6 +485,9 @@ export function ScreenPage() {
           <div className="k-list">
             {data.recent.slice(0, 4).map((r, i) => <div key={i} className="row"><Check size={20} color="#a8f0cf" /> {r.name}</div>)}
           </div>
+        )}
+        {!!data.thanks?.length && (
+          <p className="k-muted k-thanks">{tn(data.thanks.length, 'With thanks to our sponsor: {names}', 'With thanks to our sponsors: {names}', { names: data.thanks.join(', ') })}</p>
         )}
         {error && <p className="k-muted" style={{ marginTop: 16 }}>{t('Reconnecting.')}</p>}
       </div>

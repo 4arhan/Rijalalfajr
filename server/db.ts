@@ -8,7 +8,7 @@ export interface Db {
   close(): Promise<void>;
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /** Thrown on a hosted deployment that has no DATABASE_URL yet. */
 export class NoDatabaseError extends Error {
@@ -244,6 +244,87 @@ create table if not exists reports (
   reason text not null,
   created_at timestamptz not null default now(),
   resolved_at timestamptz
+);
+
+-- Version 4: milestones and kudos, "I'm awake", requests to be excused, the prize
+-- wish-list, family names and friendly matches.
+alter table users add column if not exists family_name text;
+
+-- The first time a person reaches a number of dawns in a row, or a total. Forty in a
+-- row is the roll of honour, which is why these rows are kept rather than worked out.
+create table if not exists milestones (
+  id text primary key,
+  striver_id text not null references strivers(id) on delete cascade,
+  mosque_id text references mosques(id) on delete set null,
+  kind text not null check (kind in ('streak','total')),
+  value int not null,
+  fajr_date text not null,
+  created_at timestamptz not null default now(),
+  unique (striver_id, kind, value)
+);
+create index if not exists milestones_mosque on milestones(mosque_id, fajr_date);
+
+create table if not exists kudos (
+  milestone_id text not null references milestones(id) on delete cascade,
+  from_striver text not null references strivers(id) on delete cascade,
+  seen boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (milestone_id, from_striver)
+);
+
+create table if not exists awake (
+  striver_id text not null references strivers(id) on delete cascade,
+  fajr_date text not null,
+  at timestamptz not null default now(),
+  primary key (striver_id, fajr_date)
+);
+
+create table if not exists excuse_requests (
+  id text primary key,
+  striver_id text not null references strivers(id) on delete cascade,
+  mosque_id text not null references mosques(id) on delete cascade,
+  from_date text not null,
+  to_date text not null,
+  reason text not null default '',
+  status text not null default 'pending' check (status in ('pending','approved','declined')),
+  by_user_id text references users(id) on delete set null,
+  decided_by text references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists excuse_requests_mosque on excuse_requests(mosque_id, status);
+
+-- What a mosque would like for its prizes, and who has offered to give it.
+create table if not exists wishes (
+  id text primary key,
+  mosque_id text not null references mosques(id) on delete cascade,
+  title text not null,
+  qty int not null default 1,
+  detail text not null default '',
+  created_at timestamptz not null default now()
+);
+create table if not exists wish_pledges (
+  id text primary key,
+  wish_id text not null references wishes(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  name text not null,
+  qty int not null default 1,
+  email text not null,
+  phone text not null default '',
+  note text not null default '',
+  confirmed boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Two mosques, a set of days, and the share of each one's members who show up.
+create table if not exists matches (
+  id text primary key,
+  a_mosque text not null references mosques(id) on delete cascade,
+  b_mosque text not null references mosques(id) on delete cascade,
+  start_date text not null,
+  end_date text not null,
+  status text not null default 'pending' check (status in ('pending','accepted','declined')),
+  created_by text references users(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 `;
 
