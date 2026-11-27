@@ -2168,10 +2168,14 @@ export function createApp(opts: AppOptions) {
       }
       rows.push({ id: newId(), name: p.name, grp: p.grp, card: newId(14), classId });
     }
-    for (const r of rows) {
-      await db.query(`insert into strivers (id, name, grp, managed_mosque_id, home_mosque_id, card_code, class_id) values ($1,$2,$3,$4,$4,$5,$6)`, [
-        r.id, r.name, r.grp, id, r.card, r.classId,
-      ]);
+    // One statement for the whole register, however long it is.
+    if (rows.length) {
+      await db.query(
+        `insert into strivers (id, name, grp, managed_mosque_id, home_mosque_id, card_code, class_id)
+         select u.id, u.name, u.grp, $1, $1, u.card, u.class_id
+         from unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[]) as u(id, name, grp, card, class_id)`,
+        [id, rows.map((r) => r.id), rows.map((r) => r.name), rows.map((r) => r.grp), rows.map((r) => r.card), rows.map((r) => r.classId)],
+      );
     }
     return c.json({ added: rows.length, skipped, classesMade });
   });
@@ -2321,9 +2325,11 @@ export function createApp(opts: AppOptions) {
     for (const r of rows) {
       const a = await matchSide(db, r.a_mosque, r.a_name, r.a_city, r.a_tz, r.start_date, r.end_date, now);
       const b = await matchSide(db, r.b_mosque, r.b_name, r.b_city, r.b_tz, r.start_date, r.end_date, now);
+      // The two mosques may be on different dates: it has begun once it has begun for either, and is over once it is over for both.
+      const days = [localDate(now, r.a_tz), localDate(now, r.b_tz)].sort();
       out.push({
         id: r.id, startDate: r.start_date, endDate: r.end_date, a, b,
-        status: r.status === 'pending' ? 'invited' : today < r.start_date ? 'upcoming' : today > r.end_date ? 'ended' : 'active',
+        status: r.status === 'pending' ? 'invited' : days[1] < r.start_date ? 'upcoming' : days[0] > r.end_date ? 'ended' : 'active',
         // True when this mosque is the one that was invited and still has to answer.
         toAnswer: r.status === 'pending' && r.b_mosque === mosqueId,
       });

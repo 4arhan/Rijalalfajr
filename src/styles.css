@@ -3265,3 +3265,17 @@ button.item:active {
     margin-bottom: 3px;
   }
 }
+
+/* The top bar fades out at its lower edge instead of ending in a line. */
+:root {
+  --topbar: rgba(242, 245, 242, 0.9);
+}
+:root[data-theme='dark'] {
+  --topbar: rgba(7, 13, 10, 0.88);
+}
+.topbar {
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-mask-image: linear-gradient(180deg, #000 86%, transparent);
+  mask-image: linear-gradient(180deg, #000 86%, transparent);
+}

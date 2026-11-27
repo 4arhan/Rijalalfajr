@@ -667,14 +667,16 @@ describe('community', () => {
       { name: 'Hafsa Ali', grp: 'kids', className: 'Year 5' },
       { name: 'Maryam Ali', grp: 'youth', className: 'year 5' },
       { name: 'hafsa ali', grp: 'kids' },
+      { name: 'Zayd Unclassed', grp: 'adults' },
     ];
     expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: m1.token, body: { people } })).status).toBe(403);
     expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: lead.token, body: { people: [] } })).status).toBe(400);
-    expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: lead.token, body: { people } })).json).toEqual({ added: 2, skipped: 2, classesMade: 1 });
+    expect((await call('POST', `/mosques/${dawn}/roster/import`, { token: lead.token, body: { people } })).json).toEqual({ added: 3, skipped: 2, classesMade: 1 });
     const list = (await call('GET', `/mosques/${dawn}/roster`, { token: lead.token })).json.people;
     const hafsa = list.find((p: any) => p.name === 'Hafsa Ali');
     expect(hafsa).toMatchObject({ grp: 'kids', managed: true });
     expect(list.find((p: any) => p.name === 'Maryam Ali')).toMatchObject({ grp: 'youth', classId: hafsa.classId });
+    expect(list.find((p: any) => p.name === 'Zayd Unclassed')).toMatchObject({ grp: 'adults', classId: null, managed: true });
     expect((await call('GET', `/mosques/${dawn}/classes`, { token: lead.token })).json.classes).toMatchObject([{ name: 'Year 5', members: 2 }]);
   });
 
