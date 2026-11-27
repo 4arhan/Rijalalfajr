@@ -209,7 +209,7 @@ function MosqueView({ id, back }: { id: string; back?: true }) {
           <WishCard wishes={page.data.wishes} mosqueId={mosque.id} signedIn={!!me} admin={role === 'admin'} onChange={page.reload} />
 
           {page.data.thanks.length > 0 && (
-            <div className="note thanks"><HandHeart size={18} /> <span>{tn(page.data.thanks.length, 'With thanks to our sponsor: {names}', 'With thanks to our sponsors: {names}', { names: page.data.thanks.join(', ') })}</span></div>
+            <div className="note thanks"><HandHeart size={18} /> <span>{t('With thanks to {names}', { names: page.data.thanks.join(', ') })}</span></div>
           )}
 
           <Link to={`/sponsor?mosque=${mosque.id}`} className="card row tap">

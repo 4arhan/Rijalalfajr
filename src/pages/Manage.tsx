@@ -487,7 +487,7 @@ export function ScreenPage() {
           </div>
         )}
         {!!data.thanks?.length && (
-          <p className="k-muted k-thanks">{tn(data.thanks.length, 'With thanks to our sponsor: {names}', 'With thanks to our sponsors: {names}', { names: data.thanks.join(', ') })}</p>
+          <p className="k-muted k-thanks">{t('With thanks to {names}', { names: data.thanks.join(', ') })}</p>
         )}
         {error && <p className="k-muted" style={{ marginTop: 16 }}>{t('Reconnecting.')}</p>}
       </div>

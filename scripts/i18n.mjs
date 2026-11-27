@@ -35,6 +35,15 @@ for (const m of read('server/board.ts').matchAll(new RegExp(`b\\('\\w+',\\s*${ST
 keys.add('Anonymous striver');
 keys.delete('');
 
+// A count picks the form, so both forms of a plural must show it. Without {n} a translation cannot
+// be checked, and languages with more than two forms have nothing to choose by.
+const unnumbered = [...keys].filter((k) => k.includes('|') && !/\{n\}/.test(k));
+if (unnumbered.length) {
+  console.log('These plurals have no {n}. Use t() with one sentence instead:');
+  unnumbered.forEach((k) => console.log('   ' + k));
+  process.exit(1);
+}
+
 const en = Object.fromEntries([...keys].sort((a, b) => a.localeCompare(b)).map((k) => [k, k]));
 writeFileSync(join(root, 'src/locales/en.json'), JSON.stringify(en, null, 1) + '\n');
 console.log(`en.json: ${keys.size} entries`);
