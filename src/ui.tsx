@@ -110,7 +110,7 @@ export function Screen(props: { title: string; eyebrow?: ReactNode; back?: strin
         )}
         <div className="titles">
           {props.eyebrow && <div className="eyebrow">{props.eyebrow}</div>}
-          <h1>{props.title}</h1>
+          <h1 className={props.title.length > 24 ? 'xs' : props.title.length > 17 ? 'sm' : undefined}>{props.title}</h1>
         </div>
         {props.action}
       </header>

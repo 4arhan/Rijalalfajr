@@ -3279,3 +3279,67 @@ button.item:active {
   -webkit-mask-image: linear-gradient(180deg, #000 86%, transparent);
   mask-image: linear-gradient(180deg, #000 86%, transparent);
 }
+
+/* ---------- room for longer words in other languages ---------- */
+.topbar h1 {
+  line-height: 38px;
+}
+.topbar h1.sm {
+  font-size: 22px;
+}
+.topbar h1.xs {
+  font-size: 19px;
+  letter-spacing: -0.015em;
+}
+.between.wrap {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+/* A label that takes two lines keeps the three times on one line with each other. */
+.times div {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
+}
+.times small {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.fom b {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.awake-tag {
+  color: var(--gold-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.awake-tag svg {
+  vertical-align: -1.5px;
+}
+
+/* A toast takes the width its words need, up to the width of the screen. */
+.toast {
+  left: 16px;
+  right: 16px;
+  width: fit-content;
+  max-width: min(calc(100% - 32px), 520px);
+  margin-inline: auto;
+  transform: none;
+  text-align: center;
+  border-radius: 22px;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.ring .mid small {
+  display: block;
+  max-width: 72px;
+  margin: 2px auto 0;
+  line-height: 1.15;
+}

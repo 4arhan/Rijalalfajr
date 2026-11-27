@@ -2,6 +2,7 @@
 //   t('Check in for Fajr')
 //   t('{count} of {goal} dawns', { count, goal })
 //   tn(n, '{n} day', '{n} days')
+//   t('award::Most consistent')   the same English as another label, where translations must differ
 // A language is one JSON file in src/locales. Switching language reloads the page.
 import { Fragment, type ReactNode } from 'react';
 
@@ -43,8 +44,11 @@ function fill(text: string, vars?: Vars) {
   return vars ? text.replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name] ?? '') : whole)) : text;
 }
 
+/** A key may start with a note on where it is used, as in "award::Most consistent". English shows it without the note. */
+const plain = (key: string) => key.replace(/^[a-z]+::/, '');
+
 export function t(key: string, vars?: Vars): string {
-  return fill(dict[key] ?? key, vars);
+  return fill(dict[key] ?? plain(key), vars);
 }
 
 /**
@@ -64,7 +68,7 @@ export function tn(n: number, one: string, other: string, vars?: Vars): string {
 
 /** Like t(), for a sentence with bold parts or with elements as values. */
 export function tx(key: string, vars: Record<string, ReactNode> = {}): ReactNode {
-  const parts = (dict[key] ?? key).split(/(<b>.*?<\/b>|\{\w+\})/g).filter(Boolean);
+  const parts = (dict[key] ?? plain(key)).split(/(<b>.*?<\/b>|\{\w+\})/g).filter(Boolean);
   const piece = (part: string, i: number): ReactNode => {
     const name = /^\{(\w+)\}$/.exec(part)?.[1];
     if (name && name in vars) return <Fragment key={i}>{vars[name]}</Fragment>;

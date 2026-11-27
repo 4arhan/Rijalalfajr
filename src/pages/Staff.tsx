@@ -135,7 +135,7 @@ export function WishesPage() {
       )}
       <section className="card form">
         <Eyebrow icon={<Gift size={15} />}>{t('Add to the wish-list')}</Eyebrow>
-        <div className="grid2" style={{ gridTemplateColumns: '2fr 1fr' }}>
+        <div className="grid2" style={{ gridTemplateColumns: '2fr 1fr', alignItems: 'end' }}>
           <Field label={t('What would you like?')}><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder={t('e.g. Bicycle')} /></Field>
           <Field label={t('How many?')}><input type="number" inputMode="numeric" min={1} max={1000} value={qty} onChange={(e) => setQty(Number(e.target.value))} /></Field>
         </div>

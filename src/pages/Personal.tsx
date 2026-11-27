@@ -70,9 +70,11 @@ export function BuddiesPage() {
                 <span className={`check${b.doneToday ? ' on' : ''}`}><Check size={16} /></span>
                 <span className="grow">
                   <b>{b.name}</b>
-                  <span className="sub" style={{ display: 'block' }}>{`${b.doneToday ? t('At Fajr today') : t('Not checked in yet')} · ${tn(b.streak, '{n} day in a row', '{n} days in a row')}`}</span>
+                  <span className="sub" style={{ display: 'block' }}>
+                    {b.awake && !b.doneToday && <span className="awake-tag"><Sun size={12} /> {t('Awake')} · </span>}
+                    {`${b.doneToday ? t('At Fajr today') : t('Not checked in yet')} · ${tn(b.streak, '{n} day in a row', '{n} days in a row')}`}
+                  </span>
                 </span>
-                {b.awake && !b.doneToday && <span className="pill gold"><Sun size={13} /> {t('Awake')}</span>}
                 {!b.doneToday && (
                   <button className="btn soft sm" disabled={act.busy || b.nudged} onClick={() => nudge(b)}><BellRing size={15} /> {b.nudged ? t('Nudged') : t('Nudge')}</button>
                 )}

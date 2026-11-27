@@ -133,7 +133,7 @@ export function MatchCard({ match, home, children }: { match: Match; home: strin
   );
   return (
     <section className="card match">
-      <div className="between">
+      <div className="between wrap">
         <Eyebrow icon={<Swords size={15} />}>{t('Friendly match')}</Eyebrow>
         <span className="muted small">
           {match.status === 'active' ? t('Day {day} of {total}', { day, total }) : match.status === 'ended' ? t('Final score') : t('Starts {date}', { date: niceDate(match.startDate, { weekday: 'short', day: 'numeric', month: 'short' }) })}
@@ -151,7 +151,7 @@ export function MatchCard({ match, home, children }: { match: Match; home: strin
 }
 
 const AWARD: Record<AwardRow['kind'], { icon: React.ReactNode; label: () => string }> = {
-  consistent: { icon: <Award size={20} />, label: () => t('Most consistent') },
+  consistent: { icon: <Award size={20} />, label: () => t('award::Most consistent') },
   improved: { icon: <TrendingUp size={20} />, label: () => t('Most improved') },
   newcomer: { icon: <Sprout size={20} />, label: () => t('Best newcomer') },
 };
@@ -160,7 +160,7 @@ export function AwardsCard({ awards, week }: { awards: AwardRow[]; week: Communi
   if (!awards.length) return null;
   return (
     <section className="card">
-      <div className="between" style={{ marginBottom: 10 }}>
+      <div className="between wrap" style={{ marginBottom: 10 }}>
         <Eyebrow icon={<Award size={15} />}>{t('Awards for last week')}</Eyebrow>
         <span className="muted small">{t('{from} to {to}', { from: niceDate(week.from), to: niceDate(week.to) })}</span>
       </div>

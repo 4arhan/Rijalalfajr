@@ -13,7 +13,7 @@ interface MosqueAward { kind: 'consistent' | 'improved' | 'newcomer'; id: string
 interface WorldData { rows: Row[]; groups: GroupRow[]; countries: string[]; seasons: Season[]; awards?: MosqueAward[]; week?: { from: string; to: string } }
 
 const AWARD: Record<MosqueAward['kind'], { icon: React.ReactNode; label: () => string; detail: (v: number) => string }> = {
-  consistent: { icon: <Award size={20} />, label: () => t('Most consistent'), detail: (v) => t('{value}% of its strivers each day', { value: v }) },
+  consistent: { icon: <Award size={20} />, label: () => t('award::Most consistent'), detail: (v) => t('{value}% of its strivers each day', { value: v }) },
   improved: { icon: <TrendingUp size={20} />, label: () => t('Most improved'), detail: (v) => t('{value}% more check-ins than the week before', { value: v }) },
   newcomer: { icon: <Sprout size={20} />, label: () => t('Best newcomer'), detail: (v) => tn(v, '{n} check-in in its first weeks', '{n} check-ins in its first weeks') },
 };
@@ -68,7 +68,7 @@ export function WorldPage() {
 
       {data && !!data.awards?.length && data.week && (
         <section className="card">
-          <div className="between" style={{ marginBottom: 10 }}>
+          <div className="between wrap" style={{ marginBottom: 10 }}>
             <Eyebrow icon={<Award size={15} />}>{t('Awards for last week')}</Eyebrow>
             <span className="muted small">{t('{from} to {to}', { from: niceDate(data.week.from), to: niceDate(data.week.to) })}</span>
           </div>
